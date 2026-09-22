@@ -1,6 +1,27 @@
 #!/bin/bash
 set -e
 
+DO_FLASH=false
+
+for arg in "$@"; do
+    case "$arg" in
+        --flash|-f)
+            DO_FLASH=true
+            ;;
+        --help|-h)
+            echo "Usage: $0 [--flash]"
+            echo "  no option    Build firmware only"
+            echo "  --flash, -f  Build and flash firmware"
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $arg" >&2
+            echo "Usage: $0 [--flash]" >&2
+            exit 2
+            ;;
+    esac
+done
+
 echo "============================== Building STM32F411 firmware ================================"
 
 # Toolchain
@@ -75,9 +96,11 @@ echo "================================= Generating binary/hex ==================
 $OBJCOPY -O binary $OUT.elf $OUT.bin
 $OBJCOPY -O ihex   $OUT.elf $OUT.hex
 
+if "$DO_FLASH"; then
 echo "======================================= Flashing =========================================="
 
 # dfu-util -a 0 -s 0x08000000:force:leave -D $OUT.bin
 st-flash --reset write "$OUT.bin" 0x08000000
+fi
 
 echo "========================================= Done ============================================"
