@@ -24,7 +24,7 @@ static uint32_t DESCENT_ALTITUDE_THRESH = 10; //10m/s^2
 static uint32_t DESCENT_TIME_THRESH = 5; //5ms
 uint32_t altitude = 0; 
 uint32_t descent_start_time = 0; 
-uint32_t decent_time = 0; 
+uint32_t descent_time = 0; 
 uint32_t max_altitude = 0; 
 
 static uint32_t DEPLOYMENT_ALTITUDE_THRESH = 10; //10m/s^2
@@ -34,6 +34,7 @@ uint32_t deployment_time = 0;
 
 static uint32_t LANDED_VELOCITY_THRESH = 10; //10m/s^2
 static uint32_t LANDED_TIME_THRESH = 5; //5ms
+uint32_t velocity = 0; 
 uint32_t landed_start_time = 0; 
 uint32_t landed_time = 0; 
 
@@ -42,13 +43,23 @@ static float maxAltitude = 0.0f;
 static float maxVelocity = 0.0f;
 static float maxAccel = 0.0f;
 
+typedef enum {
+    STANDBY,
+    LAUNCH,
+    DESCENT,
+    DEPLOYMENT,
+    LANDED
+} State;
 
+State current_flight_state = STANDBY;
+uint32_t first_detection_time = 0;
+uint8_t timer = 0;
+
+void FlightState_Update();
 
 
 int main(void) {
 
-    int PACKET_SIZE = 32;
-    uint8_t rx_buffer[PACKET_SIZE];
 
     //recieving the packet
     //need to set input timing on VectorNav
@@ -67,7 +78,7 @@ int main(void) {
             }
 
             if (accel > maxAccel) {
-                maxAccel = accel
+                maxAccel = accel;
             }
 
             FlightState_Update();
@@ -80,12 +91,10 @@ int main(void) {
             new_data = 0;  // clear flag, ready for next packet
         }
     }
+}
 
 
-    void FlightState_Update(uint32_t eeprom_calibration) {
-        State current_flight_state = STANDBY;
-        uint32_t first_detection_time = 0;
-        uint8_t timer = 0;
+    void FlightState_Update() {
 
         switch (current_flight_state) {
             case STANDBY: //STANDBY
@@ -169,10 +178,7 @@ int main(void) {
 
         }
 
-
-        return 0;
     }
-}
 
 //ask about this.
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
