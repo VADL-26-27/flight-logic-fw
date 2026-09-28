@@ -1,6 +1,6 @@
 #include "stm32f4xx.h"
+#include "stm32f411xe.h"
 #include <stdint.h>
-#include "main.h"
 
 #define PACKET_SIZE 34
 
