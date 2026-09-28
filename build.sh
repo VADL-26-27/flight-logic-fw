@@ -69,6 +69,7 @@ echo "======================================= Compiling ========================
 
 $CC $CFLAGS $DEFINES $INCLUDES -c src/main.c -o build/main.o
 $CC $CFLAGS $DEFINES $INCLUDES -c src/system_stm32f4xx.c -o build/system.o
+$CC $CFLAGS $DEFINES $INCLUDES -c src/syscalls.c -o build/syscalls.o
 
 $CC $CFLAGS \
 -c src/startup_stm32f411xe.s \
@@ -79,6 +80,7 @@ echo "======================================== Linking =========================
 $CC $CFLAGS \
 build/main.o \
 build/system.o \
+build/syscalls.o \
 build/startup.o \
 -T $LDSCRIPT \
 -nostartfiles \
