@@ -24,6 +24,7 @@
 extern "C" {
 #endif
 
+#include "imu.h"
 typedef struct {
     float x[3];        /* [h (m, up), v (m/s, up), accel bias (m/s^2)] */
     float P[3][3];     /* state covariance */
@@ -53,6 +54,8 @@ void vn_kf_step(vn_kf_t *kf,
 float vn_kf_altitude(const vn_kf_t *kf);  /* m above start, up positive */
 float vn_kf_velocity(const vn_kf_t *kf);  /* m/s, up positive */
 float vn_kf_bias(const vn_kf_t *kf);      /* m/s^2 */
+
+void updateState(uint8_t* packet, IMUState* state, vn_kf_t* kf);
 
 #ifdef __cplusplus
 }

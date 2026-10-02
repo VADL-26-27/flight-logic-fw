@@ -169,6 +169,26 @@ float vn_kf_altitude(const vn_kf_t *kf) { return kf->x[0]; }
 float vn_kf_velocity(const vn_kf_t *kf) { return kf->x[1]; }
 float vn_kf_bias(const vn_kf_t *kf)     { return kf->x[2]; }
 
+float dt = 1.0f / 100.0f;
+
+void updateState(uint8_t* packet, IMUState* state, vn_kf_t* kf) {
+    IMUPacket imu_packet;
+    parsePacket(packet, &imu_packet);
+
+    const float inv_g = 1.0f / 9.80665f;
+
+    vn_kf_step(kf,
+               imu_packet.yaw, imu_packet.pitch, imu_packet.roll,
+               imu_packet.ax * inv_g,
+               imu_packet.ay * inv_g,
+               imu_packet.az * inv_g,
+               imu_packet.pressure, dt);
+    
+    state->altitude = vn_kf_altitude(kf);
+    state->velocity = vn_kf_velocity(kf);
+    state->acceleration = kf->accel_up - vn_kf_bias(kf);
+}
+
 /* ---------------------------------------------------------------------- */
 #ifdef VN_KF_TEST
 #include <stdio.h>

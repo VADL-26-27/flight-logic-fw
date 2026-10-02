@@ -70,6 +70,11 @@ echo "======================================= Compiling ========================
 $CC $CFLAGS $DEFINES $INCLUDES -c src/main.c -o build/main.o
 $CC $CFLAGS $DEFINES $INCLUDES -c src/system_stm32f4xx.c -o build/system.o
 $CC $CFLAGS $DEFINES $INCLUDES -c src/syscalls.c -o build/syscalls.o
+$CC $CFLAGS $DEFINES $INCLUDES -c src/hardware.c -o build/hardware.o
+$CC $CFLAGS $DEFINES $INCLUDES -c src/imu.c -o build/imu.o
+$CC $CFLAGS $DEFINES $INCLUDES -c src/ring_buf.c -o build/ring_buf.o
+$CC $CFLAGS $DEFINES $INCLUDES -c src/usart2.c -o build/usart2.o
+$CC $CFLAGS $DEFINES $INCLUDES -c src/vn_kalman.c -o build/vn_kalman.o
 
 $CC $CFLAGS \
 -c src/startup_stm32f411xe.s \
@@ -82,11 +87,17 @@ build/main.o \
 build/system.o \
 build/syscalls.o \
 build/startup.o \
+build/hardware.o \
+build/imu.o \
+build/ring_buf.o \
+build/usart2.o \
+build/vn_kalman.o \
 -T $LDSCRIPT \
 -nostartfiles \
 -nostdlib \
 -Wl,--gc-sections \
 -Wl,-Map=build/firmware.map \
+-Wl,--start-group -lm -lc -lgcc -Wl,--end-group \
 -o $OUT.elf
 
 echo "========================================= Size ============================================"

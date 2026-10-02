@@ -1,17 +1,24 @@
 #include "stm32f4xx.h"
 #include "stm32f411xe.h"
 #include <stdint.h>
+#include "usart2.h"
+#include "hardware.h"
+#include "imu.h"
+#include "vn_kalman.h"
+#include <math.h>
 
-#define PACKET_SIZE 34
+#define PACKET_SIZE 36
 
-extern UART_HandleTypeDef huart2;
-extern TIM_HandleTypeDef htim3;
 
-volatile uint8_t rx_buffer[PACKET_SIZE];
-volatile uint8_t rx_index = 0;
-volatile uint8_t new_data = 0;
+char* imu_command = "$VNWRG,75,2,8,05,0108,0020*XX\r\n\0";
 
-uint8_t rx_byte;
+uint8_t imu_packet[PACKET_SIZE];
+IMUState state;
+
+vn_kf_t kalman_filter;
+
+uint8_t packet_count = 0;
+
 
 
 static uint32_t LAUNCH_ACCEL_THRESH = 10; //10m/s^2
@@ -57,156 +64,187 @@ uint8_t timer = 0;
 
 void FlightState_Update();
 
+static void uart_write_float(float value)
+{
+    // Bound the value before converting to an integer.
+    if (!isfinite(value) || fabsf(value) > 1000000.0f) {
+        usart2_write_command("invalid");
+        return;
+    }
 
-int main(void) {
+    char text[24];
+    char digits[12];
+    unsigned pos = 0;
+    unsigned count = 0;
 
+    if (value < 0.0f) {
+        text[pos++] = '-';
+        value = -value;
+    }
 
-    //recieving the packet
-    //need to set input timing on VectorNav
-    //HAL_UART_Receive_IT(&huart2, rx_buffer, PACKET_SIZE);
-    HAL_UART_Receive_IT(&huart2, &rx_byte, 1);
+    uint32_t scaled = (uint32_t)(value * 1000.0f + 0.5f);
+    uint32_t whole = scaled / 1000;
+    uint32_t fraction = scaled % 1000;
 
-    while (1) {
-        if (new_data) {
+    do {
+        digits[count++] = '0' + whole % 10;
+        whole /= 10;
+    } while (whole);
 
-            if (altitude > maxAltitude) {
-                maxAltitude = altitude;
-            }
+    while (count) {
+        text[pos++] = digits[--count];
+    }
 
-            if (velocity > maxVelocity) {
-                maxVelocity = velocity;
-            }
+    text[pos++] = '.';
+    text[pos++] = '0' + fraction / 100;
+    text[pos++] = '0' + (fraction / 10) % 10;
+    text[pos++] = '0' + fraction % 10;
+    text[pos] = '\0';
 
-            if (accel > maxAccel) {
-                maxAccel = accel;
-            }
+    usart2_write_command(text);
+}
 
-            FlightState_Update();
+static void send_state_packet_debug() {
+    if (++packet_count >= 10) {
+        packet_count = 0;
 
-            // ---- TEST: prove a packet arrived ----
-            HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+        usart2_write_command("STATE altitude=\0");
+        uart_write_float(state.altitude);
 
-            // TODO: real processing of rx_buffer goes here later
+        usart2_write_command(" velocity=\0");
+        uart_write_float(state.velocity);
 
-            new_data = 0;  // clear flag, ready for next packet
-        }
+        usart2_write_command(" acceleration=\0");
+        uart_write_float(state.acceleration);
+
+        usart2_write_command("\r\n\0");
     }
 }
 
 
-    void FlightState_Update() {
+int main(void) {
+    vn_kf_init(&kalman_filter, 0.5f, 0.01f ,0.5f);
+    hardwareInit();
+    usart2_init();
+    usart2_write_command("UART ready\r\n");
+    //recieving the packet
+    // Input command to VN
+    usart2_write_command(imu_command);
 
-        switch (current_flight_state) {
-            case STANDBY: //STANDBY
-            //while accelaration is less than threshhold and 
-            //launch time less than threshold
-                if (accel >= LAUNCH_ACCEL_THRESH) {
-
-                    if (timer == 0) {
-                        launch_start_time = HAL_GetTick();
-                        timer = 1;
-                    }
-
-                    if (HAL_GetTick() - launch_start_time >= LAUNCH_TIME_THRESH) {
-                        launch_time = HAL_GetTick() - launch_start_time;
-                        current_flight_state = LAUNCH;
-                    }
-
-                } else {
-                    timer = 0;
-                }
-                break;
-
-            case LAUNCH: //LAUNCH
-            //while altitude is greater than max altitude - 500
-
-                if (altitude < maxAltitude - DESCENT_ALTITUDE_THRESH) {
-
-                    if (timer == 0) {
-                        descent_start_time = HAL_GetTick();
-                        timer = 1;
-                    }
-
-                    if (HAL_GetTick() - descent_start_time >= DESCENT_TIME_THRESH) {
-                        descent_time = HAL_GetTick() - descent_start_time;
-                        current_flight_state = DESCENT;
-                    }
-
-                } else {
-                    timer = 0;
-                }
-                break;
-            case DESCENT: //DESCENT
-            //while altitude is greater than deployment altitude threshold
-
-                if (altitude < DEPLOYMENT_ALTITUDE_THRESH) {
-
-                    if (timer == 0) {
-                        deployment_start_time = HAL_GetTick();
-                        timer = 1;
-                    }
-
-                    if (HAL_GetTick() - deployment_start_time >= DEPLOYMENT_TIME_THRESH) {
-                        deployment_time = HAL_GetTick() - deployment_start_time;
-                        current_flight_state = DEPLOYMENT;
-                    }
-
-                } else {
-                    timer = 0;
-                }
-                break;
-            case DEPLOYMENT: //DEPLOYMENT
-            //while velocity is less than velocity threshold
-             if (velocity < LANDED_VELOCITY_THRESH) {
-
-                    if (timer == 0) {
-                        landed_start_time = HAL_GetTick();
-                        timer = 1;
-                    }
-
-                    if (HAL_GetTick() - landed_start_time >= LANDED_TIME_THRESH) {
-                        landed_time = HAL_GetTick() - landed_start_time;
-                        current_flight_state = LANDED;
-                    }
-
-                } else {
-                    timer = 0;
-                }
-                break;
-            case LANDED: //LANDED
-            //set some pins high
-
-        }
-
-    }
-
-//ask about this.
-void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-        if (huart->Instance == USART2) {
-
-            rx_buffer[rx_index] = rx_byte;
-            rx_index++;
-
-            if (rx_index >= PACKET_SIZE) {
-                if (1) { //switch to packet validation
-                    rx_index = 0;
-
-                    //kalman filter logic 
-                    new_data = 1;
-                } else {
-                    rx_index = 0;
+    while (1) {
+            if (new_data) {
+            new_data = 0;
+            if (imu_buf.count >= PACKET_SIZE) {
+                read_from_buf(&imu_buf, imu_packet, PACKET_SIZE);
+                if (validate_packet(imu_packet)) {
+                    // kalman filter logic
+                    updateState(imu_packet, &state, &kalman_filter);
+                    send_state_packet_debug();
                 }
             }
-
-            // Re-arm for the next byte
-            HAL_UART_Receive_IT(&huart2, &rx_byte, 1);
         }
-    }
-    // void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-    //     if (huart->Instance == USART2) {
-    //         packet_ready = 1;
 
-    //         // Re-arm to receive the next full packet
-    //         HAL_UART_Receive_IT(&huart2, (uint8_t *)rx_buffer, PACKET_SIZE);
+        if (state.altitude > maxAltitude) {
+                maxAltitude = state.altitude;
+            }
+
+            if (state.velocity > maxVelocity) {
+                maxVelocity = state.velocity;
+            }
+
+            if (state.acceleration > maxAccel) {
+                maxAccel = state.acceleration;
+            }
+
+            FlightState_Update();
+            // TODO: real processing of rx_buffer goes here later
+    }
+    return 0;
+}
+
+
+void FlightState_Update() {
+
+    // switch (current_flight_state) {
+    //     case STANDBY: //STANDBY
+    //     //while accelaration is less than threshhold and 
+    //     //launch time less than threshold
+    //         if (accel >= LAUNCH_ACCEL_THRESH) {
+
+    //             if (timer == 0) {
+    //                 launch_start_time = HAL_GetTick();
+    //                 timer = 1;
+    //             }
+
+    //             if (HAL_GetTick() - launch_start_time >= LAUNCH_TIME_THRESH) {
+    //                 launch_time = HAL_GetTick() - launch_start_time;
+    //                 current_flight_state = LAUNCH;
+    //             }
+
+    //         } else {
+    //             timer = 0;
+    //         }
+    //         break;
+
+    //     case LAUNCH: //LAUNCH
+    //     //while altitude is greater than max altitude - 500
+
+    //         if (altitude < maxAltitude - DESCENT_ALTITUDE_THRESH) {
+
+    //             if (timer == 0) {
+    //                 descent_start_time = HAL_GetTick();
+    //                 timer = 1;
+    //             }
+
+    //             if (HAL_GetTick() - descent_start_time >= DESCENT_TIME_THRESH) {
+    //                 descent_time = HAL_GetTick() - descent_start_time;
+    //                 current_flight_state = DESCENT;
+    //             }
+
+    //         } else {
+    //             timer = 0;
+    //         }
+    //         break;
+    //     case DESCENT: //DESCENT
+    //     //while altitude is greater than deployment altitude threshold
+
+    //         if (altitude < DEPLOYMENT_ALTITUDE_THRESH) {
+
+    //             if (timer == 0) {
+    //                 deployment_start_time = HAL_GetTick();
+    //                 timer = 1;
+    //             }
+
+    //             if (HAL_GetTick() - deployment_start_time >= DEPLOYMENT_TIME_THRESH) {
+    //                 deployment_time = HAL_GetTick() - deployment_start_time;
+    //                 current_flight_state = DEPLOYMENT;
+    //             }
+
+    //         } else {
+    //             timer = 0;
+    //         }
+    //         break;
+    //     case DEPLOYMENT: //DEPLOYMENT
+    //     //while velocity is less than velocity threshold
+    //         if (velocity < LANDED_VELOCITY_THRESH) {
+
+    //             if (timer == 0) {
+    //                 landed_start_time = HAL_GetTick();
+    //                 timer = 1;
+    //             }
+
+    //             if (HAL_GetTick() - landed_start_time >= LANDED_TIME_THRESH) {
+    //                 landed_time = HAL_GetTick() - landed_start_time;
+    //                 current_flight_state = LANDED;
+    //             }
+
+    //         } else {
+    //             timer = 0;
+    //         }
+    //         break;
+    //     case LANDED: //LANDED
+    //     //set some pins high
+
     //     }
-    // }
+
+}
