@@ -1,15 +1,7 @@
-import math
-import struct
-import time
-
-PORT = "COM5"
+﻿PORT = "COM5"
 BAUD = 115200
-SAMPLE_RATE = 100
-GRAVITY = 9.80665
-REFERENCE_PRESSURE = 101.325  # kPa
-HEIGHT = 20.0  # Peak height in meters
-MOTION_SECONDS = 20.0
-REST_SECONDS = 5.0
+PACKET_SIZE = 36
+HEADER = bytes.fromhex("fa 05 08 01 20 00")
 
 
 def crc16(data):
@@ -23,61 +15,60 @@ def crc16(data):
     return crc
 
 
-def motion_at(t):
-    """Return true height, upward velocity, and upward acceleration (SI units)."""
-    cycle = MOTION_SECONDS + 2 * REST_SECONDS
-    elapsed = t % cycle - REST_SECONDS
-    if not 0.0 < elapsed < MOTION_SECONDS:
-        return 0.0, 0.0, 0.0
-
-    # sin^4 gives a smooth rise and return, with zero velocity and
-    # acceleration at both ends. Velocity changes sign at the peak.
-    omega = math.pi / MOTION_SECONDS
-    s = math.sin(omega * elapsed)
-    c = math.cos(omega * elapsed)
-    height = HEIGHT * s**4
-    velocity = 4 * HEIGHT * omega * s**3 * c
-    acceleration = 4 * HEIGHT * omega**2 * (3 * s**2 * c**2 - s**4)
-    return height, velocity, acceleration
-
-
-def make_packet(height, acceleration):
-    # Level attitude; body Z points down. Include gravity in specific force.
-    az = -(GRAVITY + acceleration)
-    pressure = REFERENCE_PRESSURE * (1.0 - height / 44330.0)**(1.0 / 0.190295)
-    payload = struct.pack("<7f", 0, 0, 0, 0, 0, az, pressure)
-    body = bytes([0x05, 0x08, 0x01, 0x20, 0x00]) + payload
-    return b"\xFA" + body + struct.pack(">H", crc16(body))
+def extract_packets(pending):
+    """Consume valid packets; retain incomplete data for the next read."""
+    while pending:
+        start = pending.find(HEADER)
+        if start < 0:
+            # A read can end in the middle of the header.
+            if len(pending) >= len(HEADER):
+                del pending[:len(pending) - len(HEADER) + 1]
+            return
+        if start:
+            del pending[:start]
+        if len(pending) < PACKET_SIZE:
+            return
+        packet = bytes(pending[:PACKET_SIZE])
+        if crc16(packet[1:34]) != int.from_bytes(packet[34:36], "big"):
+            # Recover one byte at a time, including sync bytes in a bad frame.
+            del pending[0]
+            continue
+        del pending[:PACKET_SIZE]
+        yield packet
 
 
 def main():
     import serial
+    import time
 
-    print(f"Sending to {PORT}: rest, climb to {HEIGHT:g} m, descend, repeat.")
-    print("SIM lines show the sent motion; RX lines come from the MCU. Ctrl+C stops.")
+    print(f"Listening on {PORT} at {BAUD} baud. Ctrl+C stops.")
+    print("Printing complete, CRC-validated 36-byte IMU packets.")
+    pending = bytearray()
+    received_bytes = 0
+    valid_packets = 0
+    last_status = time.monotonic()
+    recent = bytearray()
     try:
-        with serial.Serial(PORT, BAUD, timeout=0, write_timeout=1) as port:
-            sample = 0
-            deadline = time.perf_counter()
+        with serial.Serial(PORT, BAUD, timeout=0.1) as port:
             while True:
-                # Sample time stays consistent with the MCU's fixed 0.01 s dt.
-                t = sample / SAMPLE_RATE
-                height, velocity, acceleration = motion_at(t)
-                port.write(make_packet(height, acceleration))
-                incoming = port.read(port.in_waiting)
+                incoming = port.read(port.in_waiting or 1)
                 if incoming:
-                    print(incoming.decode(errors="replace"), end="", flush=True)
-                if sample % SAMPLE_RATE == 0:
-                    print(f"\nSIM t={t:5.1f}s h={height:6.2f}m "
-                          f"v={velocity:+6.2f}m/s a={acceleration:+6.2f}m/s²")
-                sample += 1
-                deadline += 1.0 / SAMPLE_RATE
-                delay = deadline - time.perf_counter()
-                if delay > 0:
-                    time.sleep(delay)
-                else:
-                    # Avoid a burst of catch-up packets after a long host pause.
-                    deadline = time.perf_counter()
+                    received_bytes += len(incoming)
+                    recent.extend(incoming)
+                    del recent[:-36]
+                    pending.extend(incoming)
+                    for packet in extract_packets(pending):
+                        valid_packets += 1
+                        print(packet.hex(" "), flush=True)
+                now = time.monotonic()
+                if now - last_status >= 3:
+                    if received_bytes == 0:
+                        print("No serial bytes received. With the Teensy powered, reset the STM32 to send 100.", flush=True)
+                    elif valid_packets == 0:
+                        print(f"Received {received_bytes} bytes, but no valid packets. Recent HEX: {recent.hex(' ')}", flush=True)
+                    else:
+                        print(f"RX total: {received_bytes} bytes, {valid_packets} valid packets.", flush=True)
+                    last_status = now
     except KeyboardInterrupt:
         print("\nStopped.")
 

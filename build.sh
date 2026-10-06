@@ -74,6 +74,7 @@ $CC $CFLAGS $DEFINES $INCLUDES -c src/hardware.c -o build/hardware.o
 $CC $CFLAGS $DEFINES $INCLUDES -c src/imu.c -o build/imu.o
 $CC $CFLAGS $DEFINES $INCLUDES -c src/ring_buf.c -o build/ring_buf.o
 $CC $CFLAGS $DEFINES $INCLUDES -c src/usart2.c -o build/usart2.o
+$CC $CFLAGS $DEFINES $INCLUDES -c src/usart1.c -o build/usart1.o
 $CC $CFLAGS $DEFINES $INCLUDES -c src/vn_kalman.c -o build/vn_kalman.o
 
 $CC $CFLAGS \
@@ -91,6 +92,7 @@ build/hardware.o \
 build/imu.o \
 build/ring_buf.o \
 build/usart2.o \
+build/usart1.o \
 build/vn_kalman.o \
 -T $LDSCRIPT \
 -nostartfiles \
