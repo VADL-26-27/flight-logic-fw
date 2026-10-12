@@ -39,3 +39,37 @@ void parsePacket(const uint8_t* packet, IMUPacket* imupack) {
     memcpy(&imupack->az, &packet[26], sizeof(float));
     memcpy(&imupack->pressure, &packet[30], sizeof(float));
 }
+
+int imu_parser_feed(uint8_t* imu_packet, uint8_t* byte)
+{
+    static const uint8_t header[] = {
+        0xFA, 0x05, 0x08, 0x01, 0x20, 0x00
+    };
+    static uint32_t used = 0;
+
+    imu_packet[used++] = *byte;
+
+    for (;;) {
+        if (used == 0U) {
+            return 0;
+        }
+
+        uint32_t check = used < sizeof(header)
+                       ? used : sizeof(header);
+
+        if (memcmp(imu_packet, header, check) == 0) {
+            if (used < PACKET_SIZE) {
+                return 0;  // Matching header; wait for remaining bytes.
+            }
+
+            if (validate_packet(imu_packet)) {
+                used = 0;
+                return 1;
+            }
+        }
+
+        // Header mismatch or failed CRC: advance one byte and retry.
+        --used;
+        memmove(imu_packet, imu_packet + 1, used);
+    }
+}
