@@ -10,5 +10,6 @@ void usart1_receive(ring_buf *buf, uint32_t len);
 void usart1_write_command(const char *command);
 
 extern ring_buf rx_buf;
+extern volatile uint8_t new_data;
 
 #endif // USART1_H_

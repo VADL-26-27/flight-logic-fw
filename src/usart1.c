@@ -1,6 +1,7 @@
 #include "usart1.h"
 
 ring_buf rx_buf;
+volatile uint8_t new_data = 0;
 
 void usart1_init(void) {
   init_buf(&rx_buf);
