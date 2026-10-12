@@ -1,4 +1,4 @@
-﻿PORT = "/dev/cu.usbmodem1103"
+PORT = "/dev/cu.usbmodem1103"
 BAUD = 115200
 PACKET_SIZE = 36
 HEADER = bytes.fromhex("fa 05 08 01 20 00")

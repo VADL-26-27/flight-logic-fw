@@ -77,6 +77,7 @@ $CC $CFLAGS $DEFINES $INCLUDES -c src/usart2.c -o build/usart2.o
 $CC $CFLAGS $DEFINES $INCLUDES -c src/usart1.c -o build/usart1.o
 $CC $CFLAGS $DEFINES $INCLUDES -c src/vn_kalman.c -o build/vn_kalman.o
 $CC $CFLAGS $DEFINES $INCLUDES -c src/flight_state_logic.c -o build/flight_state_logic.o
+$CC $CFLAGS $DEFINES $INCLUDES -c src/timer.c -o build/timer.o
 
 $CC $CFLAGS \
 -c src/startup_stm32f411xe.s \
@@ -96,6 +97,7 @@ build/usart2.o \
 build/usart1.o \
 build/vn_kalman.o \
 build/flight_state_logic.o \
+build/timer.o \
 -T $LDSCRIPT \
 -nostartfiles \
 -nostdlib \

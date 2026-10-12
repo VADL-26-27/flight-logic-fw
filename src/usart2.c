@@ -39,7 +39,7 @@ void USART2_IRQHandler(void) {
   }
 }
 
-static bool queue_bytes(const uint8_t *data, uint32_t length) {
+bool usart2_write_bytes(const uint8_t *data, uint32_t length) {
   // Serialize queue updates with the handler and preserve interrupt state.
   uint32_t primask = __get_PRIMASK();
   __disable_irq();
@@ -60,5 +60,5 @@ static bool queue_bytes(const uint8_t *data, uint32_t length) {
 }
 
 bool usart2_write_packet(const uint8_t packet[USART2_PACKET_SIZE]) {
-  return queue_bytes(packet, USART2_PACKET_SIZE);
+  return usart2_write_bytes(packet, USART2_PACKET_SIZE);
 }

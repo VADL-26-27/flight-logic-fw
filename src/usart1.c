@@ -51,7 +51,6 @@ void USART1_IRQHandler(void) {
       return;
     }
     enqueue(&rx_buf, byte);
-    new_data = 1;
   }
 }
 

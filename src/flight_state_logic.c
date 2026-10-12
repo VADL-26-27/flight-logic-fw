@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include "flight_state_logic.h"
 #include "hardware.h"
+#include "timer.h"
 
 static uint32_t LAUNCH_ACCEL_THRESH = 10; // 10m/s^2
 static uint32_t LAUNCH_TIME_THRESH = 5;   // 5ms
@@ -34,12 +35,12 @@ void FlightState_Update(State *current_flight_state, float altitude, float veloc
           if (accel >= LAUNCH_ACCEL_THRESH) {
 
               if (timer == 0) {
-                  launch_start_time = millis();
+                  launch_start_time = now_ms();
                   timer = 1;
               }
 
-              if (millis() - launch_start_time >= LAUNCH_TIME_THRESH) {
-                  launch_time = millis() - launch_start_time;
+              if (now_ms() - launch_start_time >= LAUNCH_TIME_THRESH) {
+                  launch_time = now_ms() - launch_start_time;
                   *current_flight_state = LAUNCH;
                   timer = 0;
               }
@@ -55,13 +56,13 @@ void FlightState_Update(State *current_flight_state, float altitude, float veloc
           if (altitude < maxAltitude - DESCENT_ALTITUDE_THRESH) {
 
               if (timer == 0) {
-                  descent_start_time = millis();
+                  descent_start_time = now_ms();
                   timer = 1;
               }
 
-              if (millis() - descent_start_time >= DESCENT_TIME_THRESH)
+              if (now_ms() - descent_start_time >= DESCENT_TIME_THRESH)
               {
-                  descent_time = millis() - descent_start_time;
+                  descent_time = now_ms() - descent_start_time;
                   *current_flight_state = DESCENT;
                   timer = 0;
               }
@@ -76,13 +77,13 @@ void FlightState_Update(State *current_flight_state, float altitude, float veloc
           if (altitude < DEPLOYMENT_ALTITUDE_THRESH) {
 
               if (timer == 0) {
-                  deployment_start_time = millis();
+                  deployment_start_time = now_ms();
                   timer = 1;
               }
 
-              if (millis() - deployment_start_time >=
+              if (now_ms() - deployment_start_time >=
               DEPLOYMENT_TIME_THRESH) {
-                  deployment_time = millis() - deployment_start_time;
+                  deployment_time = now_ms() - deployment_start_time;
                   *current_flight_state = DEPLOYMENT;
                   timer = 0;
               }
@@ -97,12 +98,12 @@ void FlightState_Update(State *current_flight_state, float altitude, float veloc
           if (velocity < LANDED_VELOCITY_THRESH) { 
 
               if (timer == 0) {
-                  landed_start_time = millis();
+                  landed_start_time = now_ms();
                   timer = 1;
               }
 
-              if (millis() - landed_start_time >= LANDED_TIME_THRESH) {
-                  landed_time = millis() - landed_start_time;
+              if (now_ms() - landed_start_time >= LANDED_TIME_THRESH) {
+                  landed_time = now_ms() - landed_start_time;
                   *current_flight_state = LANDED;
                   timer = 0;
               }

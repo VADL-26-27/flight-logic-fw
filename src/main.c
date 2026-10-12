@@ -7,9 +7,9 @@
 #include "flight_state_logic.h"
 #include "imu.h"
 #include "vn_kalman.h"
+#include "timer.h"
 #include <math.h>
 
-#define PACKET_SIZE 36
 
 char *imu_command = "$VNWRG,75,2,8,05,0108,0020*XX\r\n\0";
 // char *imu_command = "100\0"; For UART debugging with a fake IMU (Teensy)
@@ -31,14 +31,18 @@ uint8_t packet_count = 0;
 uint8_t synced = 0;
 
 int main(void) {
+  
   vn_kf_init(&kalman_filter, 0.5f, 0.01f, 0.5f);
+  
   hardwareInit();
+  timer_init();
   usart2_init();
   usart1_init();
 
   // We should have this send on a set interval until we receive our first
   // packet
   usart1_write_command(imu_command);
+  delay_ms(500U);
 
   while (1) {
     if (new_data) {
@@ -57,29 +61,29 @@ int main(void) {
         if (validate_packet(imu_packet)) {
           // kalman filter logic
           updateState(imu_packet, &state, &kalman_filter);
-          ++packet_count;
-          if (packet_count == 10) {
-            usart2_write_packet(imu_packet);
+
+          if (++packet_count >= 10U) {
+            if (!usart2_write_packet(imu_packet)) {
+              // Increment a telemetry-drop counter here.
+            }
             packet_count = 0;
           }
         }
       }
     }
+    
+      if (state.altitude > maxAltitude) {
+        maxAltitude = state.altitude;
+      }
 
-    if (state.altitude > maxAltitude) {
-      maxAltitude = state.altitude;
-    }
+      if (state.velocity > maxVelocity) {
+        maxVelocity = state.velocity;
+      }
 
-    if (state.velocity > maxVelocity) {
-      maxVelocity = state.velocity;
-    }
-
-    if (state.acceleration > maxAccel) {
-      maxAccel = state.acceleration;
-    }
-
+      if (state.acceleration > maxAccel) {
+        maxAccel = state.acceleration;
+      }
     FlightState_Update(&current_flight_state, state.altitude, state.velocity, state.acceleration, maxAltitude);
-    // TODO: real processing of rx_buffer goes here later
   }
   return 0;
 }
