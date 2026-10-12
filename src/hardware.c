@@ -50,6 +50,19 @@ void led2Init(void) {
   // GPIOA->BSRR |= (1U << 5);
 }
 
+static volatile uint32_t g_ms = 0;
+
+// Runs automatically every 1 ms. The name must match the startup file exactly.
+void SysTick_Handler(void)
+{
+    g_ms++;
+}
+
+uint32_t millis(void)
+{
+    return g_ms;
+}
+
 void hardwareInit(void) {
   // Enable clock
   RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
@@ -62,4 +75,9 @@ void hardwareInit(void) {
 
   // -- LED --
   led2Init();
+
+  SystemCoreClockUpdate();                 // refresh the CMSIS clock-speed variable
+  SysTick_Config(SystemCoreClock / 1000);  // interrupt every 1 ms
 }
+
+

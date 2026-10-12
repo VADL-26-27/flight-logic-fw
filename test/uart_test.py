@@ -1,4 +1,4 @@
-﻿PORT = "COM5"
+﻿PORT = "/dev/cu.usbmodem1103"
 BAUD = 115200
 PACKET_SIZE = 36
 HEADER = bytes.fromhex("fa 05 08 01 20 00")
@@ -40,9 +40,12 @@ def extract_packets(pending):
 def main():
     import serial
     import time
+    import struct 
 
     print(f"Listening on {PORT} at {BAUD} baud. Ctrl+C stops.")
-    print("Printing complete, CRC-validated 36-byte IMU packets.")
+    print(f"{'Yaw':>8} {'Pitch':>8} {'Roll':>8} | {'Ax':>8} {'Ay':>8} {'Az':>8} | {'Pressure':>9}")
+    print(f"{'(deg)':>8} {'(deg)':>8} {'(deg)':>8} | {'(m/s²)':>8} {'(m/s²)':>8} {'(m/s²)':>8} | {'(kPa)':>9}")
+    print("-" * 70)
     pending = bytearray()
     received_bytes = 0
     valid_packets = 0
@@ -59,7 +62,9 @@ def main():
                     pending.extend(incoming)
                     for packet in extract_packets(pending):
                         valid_packets += 1
-                        print(packet.hex(" "), flush=True)
+                        yaw, pitch, roll, ax, ay, az, pres = struct.unpack_from("<7f", packet, 6)
+                        print(f"{yaw:8.2f} {pitch:8.2f} {roll:8.2f} | "
+                              f"{ax:8.3f} {ay:8.3f} {az:8.3f} | {pres:9.3f}", flush=True)
                 now = time.monotonic()
                 if now - last_status >= 3:
                     if received_bytes == 0:

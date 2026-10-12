@@ -76,6 +76,7 @@ $CC $CFLAGS $DEFINES $INCLUDES -c src/ring_buf.c -o build/ring_buf.o
 $CC $CFLAGS $DEFINES $INCLUDES -c src/usart2.c -o build/usart2.o
 $CC $CFLAGS $DEFINES $INCLUDES -c src/usart1.c -o build/usart1.o
 $CC $CFLAGS $DEFINES $INCLUDES -c src/vn_kalman.c -o build/vn_kalman.o
+$CC $CFLAGS $DEFINES $INCLUDES -c src/flight_state_logic.c -o build/flight_state_logic.o
 
 $CC $CFLAGS \
 -c src/startup_stm32f411xe.s \
@@ -94,6 +95,7 @@ build/ring_buf.o \
 build/usart2.o \
 build/usart1.o \
 build/vn_kalman.o \
+build/flight_state_logic.o \
 -T $LDSCRIPT \
 -nostartfiles \
 -nostdlib \
