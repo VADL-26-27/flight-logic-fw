@@ -1,10 +1,14 @@
-﻿PORT = "COM5"
+import struct
+import serial
+
+PORT = "COM5"
 BAUD = 115200
+
+HEADER = bytes.fromhex("FA 05 08 01 20 00")
 PACKET_SIZE = 36
-HEADER = bytes.fromhex("fa 05 08 01 20 00")
 
 
-def crc16(data):
+def vn_crc16(data):
     crc = 0
     for byte in data:
         crc = ((crc >> 8) | (crc << 8)) & 0xFFFF
@@ -15,62 +19,63 @@ def crc16(data):
     return crc
 
 
-def extract_packets(pending):
-    """Consume valid packets; retain incomplete data for the next read."""
-    while pending:
-        start = pending.find(HEADER)
-        if start < 0:
-            # A read can end in the middle of the header.
-            if len(pending) >= len(HEADER):
-                del pending[:len(pending) - len(HEADER) + 1]
-            return
-        if start:
-            del pending[:start]
-        if len(pending) < PACKET_SIZE:
-            return
-        packet = bytes(pending[:PACKET_SIZE])
-        if crc16(packet[1:34]) != int.from_bytes(packet[34:36], "big"):
-            # Recover one byte at a time, including sync bytes in a bad frame.
-            del pending[0]
-            continue
-        del pending[:PACKET_SIZE]
-        yield packet
-
-
 def main():
-    import serial
-    import time
+    buffer = bytearray()
+    valid = 0
+    crc_errors = 0
 
     print(f"Listening on {PORT} at {BAUD} baud. Ctrl+C stops.")
-    print("Printing complete, CRC-validated 36-byte IMU packets.")
-    pending = bytearray()
-    received_bytes = 0
-    valid_packets = 0
-    last_status = time.monotonic()
-    recent = bytearray()
+
     try:
         with serial.Serial(PORT, BAUD, timeout=0.1) as port:
             while True:
-                incoming = port.read(port.in_waiting or 1)
-                if incoming:
-                    received_bytes += len(incoming)
-                    recent.extend(incoming)
-                    del recent[:-36]
-                    pending.extend(incoming)
-                    for packet in extract_packets(pending):
-                        valid_packets += 1
-                        print(packet.hex(" "), flush=True)
-                now = time.monotonic()
-                if now - last_status >= 3:
-                    if received_bytes == 0:
-                        print("No serial bytes received. With the Teensy powered, reset the STM32 to send 100.", flush=True)
-                    elif valid_packets == 0:
-                        print(f"Received {received_bytes} bytes, but no valid packets. Recent HEX: {recent.hex(' ')}", flush=True)
-                    else:
-                        print(f"RX total: {received_bytes} bytes, {valid_packets} valid packets.", flush=True)
-                    last_status = now
+                buffer.extend(port.read(port.in_waiting or 1))
+
+                while True:
+                    start = buffer.find(HEADER)
+
+                    if start == -1:
+                        # Preserve a possible partial header across reads.
+                        if len(buffer) > len(HEADER) - 1:
+                            del buffer[: -(len(HEADER) - 1)]
+                        break
+
+                    if start:
+                        del buffer[:start]
+
+                    if len(buffer) < PACKET_SIZE:
+                        break
+
+                    packet = bytes(buffer[:PACKET_SIZE])
+
+                    calculated = vn_crc16(packet[1:34])
+                    received = int.from_bytes(packet[34:36], "big")
+
+                    if calculated != received:
+                        crc_errors += 1
+                        del buffer[0]  # Advance one byte and search again.
+                        continue
+
+                    del buffer[:PACKET_SIZE]
+                    valid += 1
+
+                    # Seven little-endian float32 values, starting at byte 6.
+                    yaw, pitch, roll, ax, ay, az, pressure = (
+                        struct.unpack_from("<7f", packet, 6)
+                    )
+
+                    print(
+                        f"#{valid} "
+                        f"yaw={yaw:9.3f} pitch={pitch:9.3f} "
+                        f"roll={roll:9.3f} deg | "
+                        f"ax={ax:8.3f} ay={ay:8.3f} az={az:8.3f} m/s² | "
+                        f"P={pressure:8.3f} kPa | CRC errors={crc_errors}"
+                    )
+
     except KeyboardInterrupt:
-        print("\nStopped.")
+        print(f"\nStopped. Valid packets={valid}, CRC errors={crc_errors}")
+    except serial.SerialException as error:
+        print(f"\nSerial error: {error}")
 
 
 if __name__ == "__main__":

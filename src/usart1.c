@@ -1,7 +1,6 @@
 #include "usart1.h"
 
 ring_buf rx_buf;
-volatile uint8_t new_data = 0;
 
 void usart1_init(void) {
   init_buf(&rx_buf);
@@ -51,7 +50,6 @@ void USART1_IRQHandler(void) {
       return;
     }
     enqueue(&rx_buf, byte);
-    new_data = 1;
   }
 }
 

@@ -6,9 +6,9 @@
 #include "hardware.h"
 #include "imu.h"
 #include "vn_kalman.h"
+#include "timer.h"
 #include <math.h>
 
-#define PACKET_SIZE 36
 
 char *imu_command = "$VNWRG,75,2,8,05,0108,0020*XX\r\n\0";
 // char *imu_command = "100\0"; For UART debugging with a fake IMU (Teensy)
@@ -56,46 +56,52 @@ uint8_t packet_count = 0;
 void FlightState_Update();
 
 int main(void) {
+  
   vn_kf_init(&kalman_filter, 0.5f, 0.01f, 0.5f);
+  
   hardwareInit();
+  timer_init();
   usart2_init();
   usart1_init();
 
   // We should have this send on a set interval until we receive our first
   // packet
   usart1_write_command(imu_command);
+  delay_ms(500U);
 
-  while (1) {
-    if (new_data) {
-      new_data = 0;
-      if (rx_buf.count >= PACKET_SIZE) {
-        read_from_buf(&rx_buf, imu_packet, PACKET_SIZE);
-        if (validate_packet(imu_packet)) {
-          // kalman filter logic
+    while (1) {
+      for (uint8_t i = 0; i < PACKET_SIZE; ++i) {
+        if (atomic_load_explicit(&rx_buf.count, memory_order_acquire) == 0U)
+          break;
+        
+        uint8_t byte;
+        read_from_buf(&rx_buf, &byte, 1);
+
+        if (imu_parser_feed(imu_packet, &byte)) {
           updateState(imu_packet, &state, &kalman_filter);
-          ++packet_count;
-          if (packet_count == 10) {
-            usart2_write_packet(imu_packet);
+
+          if (++packet_count >= 10U) {
+            if (!usart2_write_packet(imu_packet)) {
+              // Increment a telemetry-drop counter here.
+            }
             packet_count = 0;
           }
         }
       }
-    }
 
-    if (state.altitude > maxAltitude) {
-      maxAltitude = state.altitude;
-    }
+      if (state.altitude > maxAltitude) {
+        maxAltitude = state.altitude;
+      }
 
-    if (state.velocity > maxVelocity) {
-      maxVelocity = state.velocity;
-    }
+      if (state.velocity > maxVelocity) {
+        maxVelocity = state.velocity;
+      }
 
-    if (state.acceleration > maxAccel) {
-      maxAccel = state.acceleration;
-    }
+      if (state.acceleration > maxAccel) {
+        maxAccel = state.acceleration;
+      }
 
-    FlightState_Update();
-    // TODO: real processing of rx_buffer goes here later
+      FlightState_Update();
   }
   return 0;
 }
