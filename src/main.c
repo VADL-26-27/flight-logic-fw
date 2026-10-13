@@ -1,18 +1,16 @@
 #include "stm32f4xx.h"
 #include "stm32f411xe.h"
 #include <stdint.h>
-#include "usart1.h"
-#include "usart2.h"
 #include "hardware.h"
 #include "flight_state_logic.h"
 #include "imu.h"
 #include "vn_kalman.h"
 #include "timer.h"
+#include "usart_board.h"
 #include <math.h>
 
 
-char *imu_command = "$VNWRG,75,2,8,05,0108,0020*XX\r\n\0";
-// char *imu_command = "100\0"; For UART debugging with a fake IMU (Teensy)
+const char imu_command[] = "$VNWRG,75,2,8,05,0108,0020*XX\r\n";
 
 uint8_t imu_packet[PACKET_SIZE];
 IMUState state;
@@ -35,54 +33,59 @@ int main(void) {
   vn_kf_init(&kalman_filter, 0.5f, 0.01f, 0.5f);
   
   hardwareInit();
-  timer_init();
-  usart2_init();
-  usart1_init();
+  board_usart_init();
 
   // We should have this send on a set interval until we receive our first
   // packet
-  usart1_write_command(imu_command);
+  usart_write(&uart1, (const uint8_t*)imu_command, sizeof(imu_command) - 1U);
   delay_ms(500U);
 
   while (1) {
-    if (new_data) {
-      new_data = 0;
-
-      while (!synced && rx_buf.count > 0) {
-        read_from_buf(&rx_buf, imu_packet, 1); //read one packet in
-        if (imu_packet[0] == 0xFA) { // looking for the header byte
-          synced = 1;
-        }
-      }
-
-      if (synced && rx_buf.count >= PACKET_SIZE - 1) {
-        read_from_buf(&rx_buf, &imu_packet[1], PACKET_SIZE - 1);
-        synced = 0; //reseting the synced value
-        if (validate_packet(imu_packet)) {
-          // kalman filter logic
-          updateState(imu_packet, &state, &kalman_filter);
-
-          if (++packet_count >= 10U) {
-            if (!usart2_write_packet(imu_packet)) {
-              // Increment a telemetry-drop counter here.
+    while (1) {
+        // Search for the packet header.
+        if (!synced) {
+            if (!usart_read(&uart1, &imu_packet[0], 1U)) {
+                break;  // No more bytes available.
             }
-            packet_count = 0;
-          }
+
+            if (imu_packet[0] != 0xFA) {
+                continue;
+            }
+
+            synced = 1;
         }
-      }
+
+        // Read the remaining packet once all its bytes are available.
+        if (!usart_read(&uart1, &imu_packet[1], PACKET_SIZE - 1U)) {
+            break;  // Preserve synced until more bytes arrive.
+        }
+
+        synced = 0;
+
+        if (validate_packet(imu_packet)) {
+            updateState(imu_packet, &state, &kalman_filter);
+
+            if (++packet_count >= 10U) {
+                if (!usart_write(&uart2, imu_packet, PACKET_SIZE)) {
+                    // Increment a telemetry-drop counter here.
+                }
+
+                packet_count = 0;
+            }
+        }
     }
-    
-      if (state.altitude > maxAltitude) {
-        maxAltitude = state.altitude;
-      }
+  
+    if (state.altitude > maxAltitude) {
+      maxAltitude = state.altitude;
+    }
 
-      if (state.velocity > maxVelocity) {
-        maxVelocity = state.velocity;
-      }
+    if (state.velocity > maxVelocity) {
+      maxVelocity = state.velocity;
+    }
 
-      if (state.acceleration > maxAccel) {
-        maxAccel = state.acceleration;
-      }
+    if (state.acceleration > maxAccel) {
+      maxAccel = state.acceleration;
+    }
     FlightState_Update(&current_flight_state, state.altitude, state.velocity, state.acceleration, maxAltitude);
   }
   return 0;
