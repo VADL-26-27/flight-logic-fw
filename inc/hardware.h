@@ -6,5 +6,4 @@
 #include <stdint.h>
 
 void hardwareInit(void);
-uint32_t millis(void);
 #endif // HARDWARE_H_
