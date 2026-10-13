@@ -1,28 +1,28 @@
 #ifndef USART_H_
 #define USART_H_
 
-#include "stm32f411xe.h"
+#include "stm32f413xx.h"
 #include "ring_buf.h"
 #include <stdbool.h>
 
 typedef struct usart usart_t;
 
 struct usart {
-    USART_TypeDef *regs;
-    IRQn_Type irqn;
-    ring_buf *rx;
-    ring_buf *tx;
+  USART_TypeDef *regs;
+  IRQn_Type irqn;
+  ring_buf *rx;
+  ring_buf *tx;
 
-    uint32_t clock_hz;
-    uint32_t baud_rate;
+  uint32_t clock_hz;
+  uint32_t baud_rate;
 
-    void (*enable_clock)(void);
-    void(*init_gpio)(void);
+  void (*enable_clock)(void);
+  void (*init_gpio)(void);
 };
 
 void usart_init(usart_t *port);
-bool usart_write(usart_t *port, const uint8_t* data, uint32_t len);
-bool usart_read(usart_t *port, uint8_t* data, uint32_t len);
+bool usart_write(usart_t *port, const uint8_t *data, uint32_t len);
+bool usart_read(usart_t *port, uint8_t *data, uint32_t len);
 void usart_handle_irq(usart_t *port);
 
 void usart_1_enable_clock(void);

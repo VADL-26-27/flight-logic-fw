@@ -5,12 +5,12 @@ OBJCOPY := arm-none-eabi-objcopy
 SIZE    := arm-none-eabi-size
 
 OUT      := build/firmware
-LDSCRIPT := STM32F411xx_FLASH.ld
+LDSCRIPT := STM32F413xx_FLASH.ld
 
 CPUFLAGS := -mcpu=cortex-m4 -mthumb \
             -mfpu=fpv4-sp-d16 -mfloat-abi=hard
 
-CPPFLAGS := -DSTM32F411xE -Iinc -Icmsis -Isrc
+CPPFLAGS := -DSTM32F413xx -Iinc -Icmsis -Isrc
 CFLAGS   := $(CPUFLAGS) -std=c11 -O0 -g \
             -ffunction-sections -fdata-sections \
             -Wall -Wextra -MMD -MP
@@ -52,7 +52,7 @@ build:
 build/%.o: src/%.c Makefile | build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
-build/startup.o: src/startup_stm32f411xe.s Makefile | build
+build/startup.o: src/startup_stm32f413xx.s Makefile | build
 	$(CC) $(CPUFLAGS) -g -c $< -o $@
 
 $(OUT).elf: $(OBJECTS) $(LDSCRIPT) Makefile
