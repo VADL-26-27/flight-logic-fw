@@ -22,6 +22,7 @@ vn_kf_t kalman_filter;
 static float maxAltitude = 0.0f;
 static float maxVelocity = 0.0f;
 static float maxAccel = 0.0f;
+static float ground_altitude = 10.0f;
 
 State current_flight_state = STANDBY;
 uint32_t first_detection_time = 0;
@@ -33,6 +34,8 @@ uint8_t synced = 0;
 int main(void) {
   vn_kf_init(&kalman_filter, 0.5f, 0.01f, 0.5f);
   hardwareInit();
+  state_leds_init();     
+  state_leds_all_on();
   usart2_init();
   usart1_init();
 
@@ -78,7 +81,9 @@ int main(void) {
       maxAccel = state.acceleration;
     }
 
-    FlightState_Update(&current_flight_state, state.altitude, state.velocity, state.acceleration, maxAltitude);
+    FlightState_Update(&current_flight_state, state.altitude, state.velocity, state.acceleration, maxAltitude, ground_altitude);
+    //state_leds_all_on();
+    state_leds_show(current_flight_state);
     // TODO: real processing of rx_buffer goes here later
   }
   return 0;

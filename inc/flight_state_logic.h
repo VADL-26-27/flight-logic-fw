@@ -4,6 +4,6 @@
  
 typedef enum { STANDBY, LAUNCH, DESCENT, DEPLOYMENT, LANDED } State;
  
-void FlightState_Update(State *current_flight_state, float altitude, float velocity, float accel, float maxAltitude);
+void FlightState_Update(State *current_flight_state, float altitude, float velocity, float accel, float maxAltitude, float ground_altitude);
  
 #endif

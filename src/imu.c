@@ -1,5 +1,8 @@
 #include "imu.h"
 
+#define GRAVITY     9.80665f
+#define DEG2RAD     0.0174532925f
+
 uint16_t vn_crc16(const uint8_t* data, uint32_t len) {
     uint16_t crc = 0;
     
@@ -38,4 +41,27 @@ void parsePacket(const uint8_t* packet, IMUPacket* imupack) {
     memcpy(&imupack->ay, &packet[22], sizeof(float));
     memcpy(&imupack->az, &packet[26], sizeof(float));
     memcpy(&imupack->pressure, &packet[30], sizeof(float));
+}
+
+// Convert pressure to altitude above the reference pressure (meters).
+float pressure_to_altitude(float p_kpa, float p0_kpa)
+{
+    if (p_kpa <= 0.0f || p0_kpa <= 0.0f) return 0.0f;
+    return 44330.0f * (1.0f - powf(p_kpa / p0_kpa, 0.190295f));
+}
+
+// Rotate body-frame accel into the vertical axis and remove gravity.
+// Returns acceleration in m/s^2, positive = up.
+float imu_vertical_accel(const IMUPacket* pkt)
+{
+    float pitch = pkt->pitch * DEG2RAD;
+    float roll  = pkt->roll  * DEG2RAD;
+
+    // Down component of the measured specific force (body -> NED).
+    float f_down = -sinf(pitch)               * pkt->ax
+                 +  sinf(roll) * cosf(pitch)  * pkt->ay
+                 +  cosf(roll) * cosf(pitch)  * pkt->az;
+
+    // At rest f_down = -g, so this gives 0.
+    return -(f_down + GRAVITY);
 }

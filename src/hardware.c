@@ -80,4 +80,41 @@ void hardwareInit(void) {
   SysTick_Config(SystemCoreClock / 1000);  // interrupt every 1 ms
 }
 
+// The five state LED pins on port B: PB5, PB4, PB10, PB6, PB8
+#define STATE_LED_MASK  ((1U << 5) | (1U << 4) | (1U << 10) | (1U << 6) | (1U << 8))
+
+// Configure the five LED pins as outputs. Call once at startup.
+void state_leds_init(void)
+{
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;      // turn on port B's clock
+
+    // Each pin has 2 mode bits at position (pin * 2). Clear them, then set 01 = output.
+    GPIOB->MODER &= ~((3U << (5*2)) | (3U << (4*2)) | (3U << (10*2)) | (3U << (6*2)) | (3U << (8*2)));
+    GPIOB->MODER |=   (1U << (5*2)) | (1U << (4*2)) | (1U << (10*2)) | (1U << (6*2)) | (1U << (8*2));
+}
+
+// Drive all five LED pins HIGH.
+void state_leds_all_on(void)
+{
+    GPIOB->BSRR = STATE_LED_MASK;             // lower 16 bits = set high
+}
+
+// Drive all five LED pins LOW.
+void state_leds_all_off(void)
+{
+    GPIOB->BSRR = STATE_LED_MASK << 16;       // upper 16 bits = set low
+}
+
+// Light only the LED for the given state (0 = STANDBY ... 4 = LANDED).
+void state_leds_show(uint8_t state)
+{
+    // Which pin belongs to each state, in the same order as the State enum
+    static const uint8_t state_pin[5] = {5, 4, 10, 6, 8};
+
+    if (state > 4) return;    // guard against a bad value indexing past the table
+
+    GPIOB->BSRR = (STATE_LED_MASK << 16)          // all five LEDs off...
+                | (1U << state_pin[state]);       // ...except this one on
+}
+
 

@@ -4,27 +4,27 @@
 #include "hardware.h"
 
 static uint32_t LAUNCH_ACCEL_THRESH = 10; // 10m/s^2
-static uint32_t LAUNCH_TIME_THRESH = 5;   // 5ms
+static uint32_t LAUNCH_TIME_THRESH = 100;   // 5ms
 uint32_t launch_start_time = 0;
 uint32_t launch_time = 0;
 
 static uint32_t DESCENT_ALTITUDE_THRESH = 10; // 10m/s^2
-static uint32_t DESCENT_TIME_THRESH = 5;      // 5ms
+static uint32_t DESCENT_TIME_THRESH = 100;      // 5ms
 uint32_t descent_start_time = 0;
 uint32_t descent_time = 0;
 uint32_t max_altitude = 0;
 
-static uint32_t DEPLOYMENT_ALTITUDE_THRESH = 10; // 10m/s^2
-static uint32_t DEPLOYMENT_TIME_THRESH = 5;      // 5ms
+static uint32_t DEPLOYMENT_ALTITUDE_THRESH = 5; // 10m/s^2
+static uint32_t DEPLOYMENT_TIME_THRESH = 100;      // 5ms
 uint32_t deployment_start_time = 0;
 uint32_t deployment_time = 0;
 
-static uint32_t LANDED_VELOCITY_THRESH = 10; // 10m/s^2
-static uint32_t LANDED_TIME_THRESH = 5;      // 5ms
+static uint32_t LANDED_VELOCITY_THRESH = 1; // 10m/s^2
+static uint32_t LANDED_TIME_THRESH = 100;      // 5ms
 uint32_t landed_start_time = 0;
 uint32_t landed_time = 0;
 
-void FlightState_Update(State *current_flight_state, float altitude, float velocity, float accel, float maxAltitude) {
+void FlightState_Update(State *current_flight_state, float altitude, float velocity, float accel, float maxAltitude, float ground_altitude) {
 
     static uint8_t timer = 0;
     switch (*current_flight_state) {
@@ -73,7 +73,7 @@ void FlightState_Update(State *current_flight_state, float altitude, float veloc
       case DESCENT: //DESCENT
       //while altitude is greater than deployment altitude threshold
 
-          if (altitude < DEPLOYMENT_ALTITUDE_THRESH) {
+          if (altitude < DEPLOYMENT_ALTITUDE_THRESH + ground_altitude) {
 
               if (timer == 0) {
                   deployment_start_time = millis();
