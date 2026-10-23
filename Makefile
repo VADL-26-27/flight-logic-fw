@@ -22,20 +22,7 @@ LDFLAGS := $(CPUFLAGS) -T$(LDSCRIPT) \
 
 LDLIBS := -Wl,--start-group -lm -lc -lgcc -Wl,--end-group
 
-# Add any separate file containing your USART IRQ handlers here.
-C_SOURCES := \
-    src/main.c \
-    src/system_stm32f4xx.c \
-    src/syscalls.c \
-    src/hardware.c \
-    src/imu.c \
-    src/ring_buf.c \
-    src/usart.c \
-    src/usart_board.c \
-    src/vn_kalman.c \
-    src/flight_state_logic.c \
-    src/timer.c \
-	src/usart_irq.c
+C_SOURCES := $(wildcard src/*.c)
 
 C_OBJECTS := $(patsubst src/%.c,build/%.o,$(C_SOURCES))
 OBJECTS   := $(C_OBJECTS) build/startup.o
@@ -52,7 +39,7 @@ build:
 build/%.o: src/%.c Makefile | build
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
-build/startup.o: src/startup_stm32f413xx.s Makefile | build
+build/startup.o: startup_stm32f413xx.s Makefile | build
 	$(CC) $(CPUFLAGS) -g -c $< -o $@
 
 $(OUT).elf: $(OBJECTS) $(LDSCRIPT) Makefile

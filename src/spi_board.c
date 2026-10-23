@@ -1,4 +1,5 @@
 #include "spi_board.h"
+#include "flash_mem.h"
 
 static void hardwareSPI1Init(void) {
   RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
@@ -34,6 +35,10 @@ static void hardwareSPI1Init(void) {
       ((1U << 4 * 2) | (2U << 5 * 2) | (2U << 6 * 2) | (2U << 7 * 2));
 }
 
+static void flash_cs_high(void) { GPIOA->BSRR = (1U << 4); }
+
+static void flash_cs_low(void) { GPIOA->BSRR = (1U << 20); }
+
 spi_t spi1 = {
     .regs = SPI1,
     .dma = DMA2,
@@ -42,10 +47,25 @@ spi_t spi1 = {
     .tx_dma_irqn = DMA2_Stream3_IRQn,
     .rx_dma_irqn = DMA2_Stream0_IRQn,
     .irqn = SPI1_IRQn,
-    .clock_hz = 25000000U,
-    .target_hz = 6250000U,
-    .enable_clock = spi_1_enable_clock,
+    .enable_clock = spi1_enable_clock,
     .init_gpio = hardwareSPI1Init,
+    .reset_periphreal = spi1_reset_periphreal,
+    .busy = false,
+    .rx_dma_done = false,
+    .tx_dma_done = false,
+    .error = false,
+    .tx_dummy = 0xFFU,
+    .rx_dummy = 0xFFU,
+    .result = SPI_RESULT_NONE,
 };
 
-void spi_board_init() { spi_init(&spi1); }
+flash_t flash = {
+    .spi = &spi1,
+    .cs_high = flash_cs_high,
+    .cs_low = flash_cs_low,
+};
+
+void board_spi_init(void) {
+  spi_init(&spi1);
+  flash_init(&flash);
+}
