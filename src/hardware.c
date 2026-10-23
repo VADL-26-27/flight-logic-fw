@@ -11,7 +11,7 @@ void led2Init(void) {
   GPIOA->PUPDR &= ~(3U << (5 * 2));
 
   // initialize off
-  GPIOA->BSRR |= (1U << (16 + 5));
+  GPIOA->BSRR = (1U << (16 + 5));
   // GPIOA->BSRR |= (1U << 5);
 }
 
@@ -52,14 +52,46 @@ void clock_init_hse(void) {
   SystemCoreClockUpdate();
 }
 
+void latch_init(void) {
+  // Set PA8 (Latch_SW3) to low
+  GPIOA->BSRR = (1U << (8 + 16));
+
+  // Set PB4 (Latch_SW1) and PB5 (Latch_SW2) to low
+  GPIOB->BSRR = (1U << (4 + 16)) | (1U << (5 + 16));
+
+  // Push-Pull Output Type
+  GPIOA->OTYPER &= ~(1U << 8);
+  GPIOB->OTYPER &= ~((1U << 4) | (1U << 5));
+
+  // No Internal pulls, external gate pull downs are present
+  GPIOA->PUPDR &= ~(3U << (2 * 8));
+  GPIOB->PUPDR &= ~((3U << (2 * 4)) | (3U << (2 * 5)));
+
+  // Set output speed low
+  GPIOA->OSPEEDR &= ~(3U << (2 * 8));
+  GPIOB->OSPEEDR &= ~((3U << (2 * 4)) | (3U << (2 * 5)));
+
+  // GPIO Output Mode
+  GPIOA->MODER &= ~(3U << (2 * 8));
+  GPIOA->MODER |= (1U << (2 * 8));
+
+  GPIOB->MODER &= ~((3U << (2 * 4)) | (3U << (2 * 5)));
+  GPIOB->MODER |= ((1U << (2 * 4)) | (1U << (2 * 5)));
+}
+
 void hardwareInit(void) {
   // Enable clock
-  RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
+  RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOBEN;
+  RCC->AHB1LPENR |= RCC_AHB1LPENR_GPIOALPEN | RCC_AHB1LPENR_GPIOBLPEN;
+
+  (void)RCC->AHB1ENR;
+  (void)RCC->AHB1LPENR;
 
   clock_init_hse();
 
   timer_init();
 
+  latch_init();
   // -- LED --
   led2Init();
 }

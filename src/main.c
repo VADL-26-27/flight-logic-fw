@@ -7,6 +7,7 @@
 #include "vn_kalman.h"
 #include "timer.h"
 #include "usart_board.h"
+#include "latch.h"
 #include <math.h>
 
 const char imu_command[] = "$VNWRG,75,2,8,05,0108,0020*XX\r\n";
