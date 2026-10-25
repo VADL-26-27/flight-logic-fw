@@ -2,7 +2,6 @@
 #define USART_BOARD_H_
 
 #include "usart.h"
-#include "hardware.h"
 
 extern usart_t uart1;
 extern usart_t uart2;
