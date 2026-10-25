@@ -7,6 +7,7 @@
 #include "vn_kalman.h"
 #include "timer.h"
 #include "usart_board.h"
+#include "latch.h"
 #include "spi_board.h"
 #include "flash_mem.h"
 
@@ -211,6 +212,23 @@ int main(void) {
 
       if (validate_packet(imu_packet)) {
         updateState(imu_packet, &state, &kalman_filter);
+      }
+    }
+
+    uint32_t now = now_ms();
+
+    if ((uint32_t)(now - switch_on) >= delay) {
+      switch_on = now;
+      on = !on;
+
+      if (on) {
+        set_latch_high(GPIOA, SW_3);
+        set_latch_high(GPIOB, SW_1);
+        set_latch_high(GPIOB, SW_2);
+      } else {
+        set_latch_low(GPIOA, SW_3);
+        set_latch_low(GPIOB, SW_1);
+        set_latch_low(GPIOB, SW_2);
       }
     }
 
