@@ -79,25 +79,10 @@ void latch_init(void) {
   GPIOB->MODER |= ((1U << (2 * 4)) | (1U << (2 * 5)));
 }
 
-void enable_12V(void) {
-  GPIOC->BSRR = (1U << (13 + 16));
-  GPIOC->OTYPER &= ~(1U << 13);
-  GPIOC->PUPDR &= ~(3U << (2 * 13));
-  GPIOC->OSPEEDR &= ~(3U << (2 * 13));
-
-  GPIOC->MODER &= ~(3U << (2 * 13));
-  GPIOC->MODER |= (1U << (2 * 13));
-
-  // Enable, assuming active-high
-  GPIOC->BSRR = 1U << 13;
-}
-
 void hardwareInit(void) {
   // Enable clock
-  RCC->AHB1ENR |=
-      RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOBEN | RCC_AHB1ENR_GPIOCEN;
-  RCC->AHB1LPENR |= RCC_AHB1LPENR_GPIOALPEN | RCC_AHB1LPENR_GPIOBLPEN |
-                    RCC_AHB1LPENR_GPIOCLPEN;
+  RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN | RCC_AHB1ENR_GPIOBEN;
+  RCC->AHB1LPENR |= RCC_AHB1LPENR_GPIOALPEN | RCC_AHB1LPENR_GPIOBLPEN;
 
   (void)RCC->AHB1ENR;
   (void)RCC->AHB1LPENR;
@@ -106,7 +91,6 @@ void hardwareInit(void) {
 
   timer_init();
 
-  enable_12V();
   latch_init();
   // -- LED --
   led2Init();
