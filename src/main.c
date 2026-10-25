@@ -38,6 +38,10 @@ static uint32_t test_number = 0U;
 uint32_t last_test_finished_ms = 0U;
 bool waiting_to_restart = false;
 
+uint32_t delay = 2000U;
+bool on = false;
+uint32_t switch_on;
+
 typedef enum {
   TEST_PROBE,
   TEST_ERASE,
