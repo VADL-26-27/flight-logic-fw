@@ -28,8 +28,12 @@ uint8_t timer = 0;
 uint8_t packet_count = 0;
 uint8_t synced = 0;
 
-int main(void) {
+bool on = false;
+uint32_t delay = 2000U;
+uint32_t switch_on;
 
+int main(void) {
+  switch_on = now_ms();
   vn_kf_init(&kalman_filter, 0.5f, 0.01f, 0.5f);
 
   hardwareInit();
@@ -72,6 +76,23 @@ int main(void) {
 
           packet_count = 0;
         }
+      }
+    }
+
+    uint32_t now = now_ms();
+
+    if ((uint32_t)(now - switch_on) >= delay) {
+      switch_on = now;
+      on = !on;
+
+      if (on) {
+        set_latch_high(GPIOA, SW_3);
+        set_latch_high(GPIOB, SW_1);
+        set_latch_high(GPIOB, SW_2);
+      } else {
+        set_latch_low(GPIOA, SW_3);
+        set_latch_low(GPIOB, SW_1);
+        set_latch_low(GPIOB, SW_2);
       }
     }
 
