@@ -41,6 +41,7 @@ bool waiting_to_restart = false;
 uint32_t delay = 2000U;
 bool on = false;
 uint32_t switch_on;
+uint8_t packet_count = 0;
 
 typedef enum {
   TEST_PROBE,
@@ -57,6 +58,9 @@ static volatile bool flash_test_done;
 static volatile bool flash_test_passed;
 static volatile bool flash_fault;
 static volatile uint32_t detected_id;
+
+static bool imu_started = false;
+static uint32_t last_imu_command_ms;
 
 static void flash_test_fail(void) {
   flash_fault = true;
@@ -150,6 +154,7 @@ int main(void) {
 
   usart_write(&uart1, (const uint8_t *)imu_command, sizeof(imu_command) - 1U);
   delay_ms(500U);
+  last_imu_command_ms = now_ms();
 
   flash_test_stage = TEST_PROBE;
 
@@ -190,36 +195,52 @@ int main(void) {
       }
     }
 
-    /*
-     * Bound UART work so flash polling runs regularly,
-     * even if UART data keeps arriving.
-     */
-    for (uint32_t budget = 0U; budget < 2U * PACKET_SIZE; ++budget) {
-
+    while (1) {
+      // Search for the packet header.
       if (!synced) {
         if (!usart_read(&uart1, &imu_packet[0], 1U)) {
-          break;
+          break; // No more bytes available.
         }
 
         if (imu_packet[0] != 0xFA) {
           continue;
         }
 
-        synced = 1U;
+        synced = 1;
       }
 
+      // Read the remaining packet once all its bytes are available.
       if (!usart_read(&uart1, &imu_packet[1], PACKET_SIZE - 1U)) {
-        break;
+        break; // Preserve synced until more bytes arrive.
       }
 
-      synced = 0U;
+      synced = 0;
 
       if (validate_packet(imu_packet)) {
+        imu_started = true;
         updateState(imu_packet, &state, &kalman_filter);
+
+        if (++packet_count >= 50U) {
+          if (!usart_write(&uart2, imu_packet, PACKET_SIZE)) {
+            // Increment a telemetry-drop counter here.
+          }
+
+          packet_count = 0;
+        }
       }
     }
 
     uint32_t now = now_ms();
+
+    if (!imu_started && (uint32_t)(now - last_imu_command_ms) >= 1000U) {
+
+      if (usart_write(&uart1, (const uint8_t *)imu_command,
+                      sizeof(imu_command) - 1U)) {
+        last_imu_command_ms = now;
+      }
+    }
+
+    now = now_ms();
 
     if ((uint32_t)(now - switch_on) >= delay) {
       switch_on = now;
