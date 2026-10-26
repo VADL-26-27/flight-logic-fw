@@ -3,24 +3,24 @@
 #include "flight_state_logic.h"
 #include "hardware.h"
 
-static uint32_t LAUNCH_ACCEL_THRESH = 10; // 10m/s^2
-static uint32_t LAUNCH_TIME_THRESH = 100;   // 5ms
+#define LAUNCH_ACCEL_THRESH      0.3f    /* G */
+#define LAUNCH_TIME_THRESH       100u     /* ms */
+#define DESCENT_ALTITUDE_THRESH  2.5f   /* ft */
+#define DESCENT_TIME_THRESH      100u    /* ms */
+#define DEPLOYMENT_ALTITUDE_THRESH 1.6f  /* ft above ground */
+#define DEPLOYMENT_TIME_THRESH   100u    /* ms */
+#define LANDED_VELOCITY_THRESH   3.3f    /* ft/s */
+#define LANDED_TIME_THRESH       100u    /* ms */
+
+
+//variables for state transisition
 uint32_t launch_start_time = 0;
 uint32_t launch_time = 0;
-
-static uint32_t DESCENT_ALTITUDE_THRESH = 10; // 10m/s^2
-static uint32_t DESCENT_TIME_THRESH = 100;      // 5ms
 uint32_t descent_start_time = 0;
 uint32_t descent_time = 0;
 uint32_t max_altitude = 0;
-
-static uint32_t DEPLOYMENT_ALTITUDE_THRESH = 5; // 10m/s^2
-static uint32_t DEPLOYMENT_TIME_THRESH = 100;      // 5ms
 uint32_t deployment_start_time = 0;
 uint32_t deployment_time = 0;
-
-static uint32_t LANDED_VELOCITY_THRESH = 1; // 10m/s^2
-static uint32_t LANDED_TIME_THRESH = 100;      // 5ms
 uint32_t landed_start_time = 0;
 uint32_t landed_time = 0;
 

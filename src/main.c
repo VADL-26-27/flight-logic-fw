@@ -22,9 +22,10 @@ vn_kf_t kalman_filter;
 static float maxAltitude = 0.0f;
 static float maxVelocity = 0.0f;
 static float maxAccel = 0.0f;
-static float ground_altitude = 10.0f;
+static float ground_altitude = 0.0f; //calculated as ground for 1st floor of olin (99.649KPa)
 
 State current_flight_state = STANDBY;
+static State prev_flight_state = STANDBY;
 uint32_t first_detection_time = 0;
 uint8_t timer = 0;
 
@@ -82,6 +83,13 @@ int main(void) {
     }
 
     FlightState_Update(&current_flight_state, state.altitude, state.velocity, state.acceleration, maxAltitude, ground_altitude);
+
+    //only start caring about altitude after launch
+    if (prev_flight_state == STANDBY && current_flight_state == LAUNCH) {
+      maxAltitude = state.altitude; 
+    }
+    prev_flight_state = current_flight_state;
+
     //state_leds_all_on();
     state_leds_show(current_flight_state);
     // TODO: real processing of rx_buffer goes here later
