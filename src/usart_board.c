@@ -45,7 +45,7 @@ static void hardwareUsart1Init(void) {
 usart_t uart1 = {
     .regs = USART1,
     .irqn = USART1_IRQn,
-    .clock_hz = 25000000U,
+    .clock_hz = 50000000U,
     .baud_rate = 115200U,
     .rx = &uart1_rx,
     .tx = &uart1_tx,
@@ -56,7 +56,7 @@ usart_t uart1 = {
 usart_t uart2 = {
     .regs = USART2,
     .irqn = USART2_IRQn,
-    .clock_hz = 25000000U,
+    .clock_hz = 50000000U,
     .baud_rate = 115200U,
     .rx = &uart2_rx,
     .tx = &uart2_tx,

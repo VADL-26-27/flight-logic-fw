@@ -1,5 +1,18 @@
 #include "hardware.h"
 
+static bool wait_register(volatile uint32_t *reg, uint32_t mask,
+                          uint32_t expected) {
+  uint32_t timeout = 1000000U;
+
+  while ((*reg & mask) != expected) {
+    if (--timeout == 0U) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 void led2Init(void) {
   // configure PA5 for output push/pull
   GPIOA->MODER |= (1U << (5 * 2));
@@ -26,28 +39,60 @@ void timer_init(void) {
   NVIC_SetPriority(SysTick_IRQn, 15U);
 }
 
-void clock_init_hse(void) {
+void clock_init(void) {
+
+  // Require normal HSI/reset
+  if ((RCC->CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_HSI ||
+      (RCC->CR & RCC_CR_PLLON)) {
+    return;
+  }
+
+  // Enable External Crystal Oscillator
   RCC->CR &= ~RCC_CR_HSEBYP;
   RCC->CR |= RCC_CR_HSEON;
 
-  uint32_t timeout = 1000000U;
+  // Wait for the Register
+  if (!wait_register(&RCC->CR, RCC_CR_HSERDY, RCC_CR_HSERDY))
+    return;
 
-  while (!(RCC->CR & RCC_CR_HSERDY)) {
-    if (--timeout == 0U) {
-      return; // SYSCLK Remains HSI
-    }
-  }
+  RCC->APB1ENR |= RCC_APB1ENR_PWREN;
+  (void)RCC->APB1ENR;
 
-  // Select HSE as system clock
-  RCC->CFGR = (RCC->CFGR & ~RCC_CFGR_SW) | RCC_CFGR_SW_HSE;
+  // Voltage Scale 1: VOS = 11
+  PWR->CR = (PWR->CR & ~PWR_CR_VOS) | PWR_CR_VOS_0 | PWR_CR_VOS_1;
+  (void)PWR->CR;
 
-  timeout = 1000000U;
+  // Three wait states for 96 MHz at 3.3 V.
+  FLASH->ACR = (FLASH->ACR & ~FLASH_ACR_LATENCY) | FLASH_ACR_LATENCY_3WS;
 
-  while ((RCC->CFGR & RCC_CFGR_SWS) != RCC_CFGR_SWS_HSE) {
-    if (--timeout == 0U) {
-      return;
-    }
-  }
+  if (!wait_register(&FLASH->ACR, FLASH_ACR_LATENCY, FLASH_ACR_LATENCY_3WS))
+    return;
+
+  // HCLK = SYSCLK /1.
+  // PCLK1 = HCLK /2; PCLK2 = HCLK /2.
+  RCC->CFGR = (RCC->CFGR & ~(RCC_CFGR_HPRE | RCC_CFGR_PPRE1 | RCC_CFGR_PPRE2)) |
+              RCC_CFGR_PPRE1_DIV2 | RCC_CFGR_PPRE2_DIV2;
+
+  // PLLM = 25, PLLN = 200, PLLP = 2, PLLQ = 4.
+  // PLLP encoding 00 means divide by 2.
+  RCC->PLLCFGR =
+      (RCC->PLLCFGR & ~(RCC_PLLCFGR_PLLM | RCC_PLLCFGR_PLLN | RCC_PLLCFGR_PLLP |
+                        RCC_PLLCFGR_PLLSRC | RCC_PLLCFGR_PLLQ)) |
+      25U | (200U << 6) | RCC_PLLCFGR_PLLSRC_HSE | (4U << 24);
+
+  RCC->CR |= RCC_CR_PLLON;
+
+  if (!wait_register(&RCC->CR, RCC_CR_PLLRDY, RCC_CR_PLLRDY))
+    return;
+
+  if (!wait_register(&PWR->CSR, PWR_CSR_VOSRDY, PWR_CSR_VOSRDY))
+    return;
+
+  // Switch SYSCLK from HSI to PLL.
+  RCC->CFGR = (RCC->CFGR & ~RCC_CFGR_SW) | RCC_CFGR_SW_PLL;
+
+  if (!wait_register(&RCC->CFGR, RCC_CFGR_SWS, RCC_CFGR_SWS_PLL))
+    return;
 
   SystemCoreClockUpdate();
 }
@@ -102,7 +147,7 @@ void hardwareInit(void) {
   (void)RCC->AHB1ENR;
   (void)RCC->AHB1LPENR;
 
-  clock_init_hse();
+  clock_init();
 
   timer_init();
 
