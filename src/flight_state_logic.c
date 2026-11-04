@@ -5,11 +5,11 @@
 
 #define LAUNCH_ACCEL_THRESH      0.3f    /* G */
 #define LAUNCH_TIME_THRESH       100u     /* ms */
-#define DESCENT_ALTITUDE_THRESH  2.5f   /* ft */
+#define DESCENT_ALTITUDE_THRESH  10.0f   /* ft */
 #define DESCENT_TIME_THRESH      100u    /* ms */
-#define DEPLOYMENT_ALTITUDE_THRESH 1.6f  /* ft above ground */
+#define DEPLOYMENT_ALTITUDE_THRESH 10.0f  /* ft above ground */
 #define DEPLOYMENT_TIME_THRESH   100u    /* ms */
-#define LANDED_VELOCITY_THRESH   3.3f    /* ft/s */
+#define LANDED_VELOCITY_THRESH   1.0f    /* ft/s */
 #define LANDED_TIME_THRESH       100u    /* ms */
 
 
