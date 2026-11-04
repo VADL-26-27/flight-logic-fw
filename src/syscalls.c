@@ -3,7 +3,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include "stm32f411xe.h"
+#include "stm32f413xx.h"
 #include <stdint.h>
 /* Called by __libc_init_array() from the vendor startup file. */
 void _init(void) {}
