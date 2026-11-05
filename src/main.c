@@ -152,6 +152,12 @@ int main(void) {
   board_usart_init();
   board_spi_init();
 
+  GPIOA->BSRR   = (1U << 0);            // high = LED off
+  GPIOA->OTYPER &= ~(1U << 0);          // push-pull
+  GPIOA->PUPDR  &= ~(3U << (0 * 2));    // no pull
+  GPIOA->MODER  &= ~(3U << (0 * 2));
+  GPIOA->MODER  |=  (1U << (0 * 2));    // output
+
   usart_write(&uart1, (const uint8_t *)imu_command, sizeof(imu_command) - 1U);
   delay_ms(500U);
   last_imu_command_ms = now_ms();

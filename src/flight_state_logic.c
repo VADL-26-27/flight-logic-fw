@@ -6,9 +6,9 @@
 
 #define LAUNCH_ACCEL_THRESH      0.3f    /* G */
 #define LAUNCH_TIME_THRESH       100u     /* ms */
-#define DESCENT_ALTITUDE_THRESH  10.0f   /* ft */
+#define DESCENT_ALTITUDE_THRESH  200.0f   /* ft */
 #define DESCENT_TIME_THRESH      100u    /* ms */
-#define DEPLOYMENT_ALTITUDE_THRESH 10.0f  /* ft above ground */
+#define DEPLOYMENT_ALTITUDE_THRESH 250.0f  /* ft above ground */
 #define DEPLOYMENT_TIME_THRESH   100u    /* ms */
 #define LANDED_VELOCITY_THRESH   1.0f    /* ft/s */
 #define LANDED_TIME_THRESH       100u    /* ms */
@@ -25,7 +25,7 @@ uint32_t deployment_time = 0;
 uint32_t landed_start_time = 0;
 uint32_t landed_time = 0;
 
-void FlightState_Update(State *current_flight_state, float altitude, float velocity, float accel, float maxAltitude, float ground_altitude) {
+void FlightState_Update(State *current_flight_state, float altitude, float velocity, float accel, float maxAltitude) {
 
     static uint8_t timer = 0;
     switch (*current_flight_state) {
@@ -52,7 +52,6 @@ void FlightState_Update(State *current_flight_state, float altitude, float veloc
 
       case LAUNCH: //LAUNCH
       //while altitude is greater than max altitude - 500
-
           if (altitude < maxAltitude - DESCENT_ALTITUDE_THRESH) {
 
               if (timer == 0) {
@@ -74,7 +73,7 @@ void FlightState_Update(State *current_flight_state, float altitude, float veloc
       case DESCENT: //DESCENT
       //while altitude is greater than deployment altitude threshold
 
-          if (altitude < DEPLOYMENT_ALTITUDE_THRESH + ground_altitude) {
+          if (altitude < DEPLOYMENT_ALTITUDE_THRESH) {
 
               if (timer == 0) {
                   deployment_start_time = now_ms();
@@ -113,7 +112,7 @@ void FlightState_Update(State *current_flight_state, float altitude, float veloc
           }
           break;
       case LANDED: //LANDED
-      //set some pins high
+        GPIOA->BSRR = (1U << 16);   // PA0 low = LED on (active-low)
         break;
 
       }
