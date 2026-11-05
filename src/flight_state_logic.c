@@ -114,6 +114,4 @@ void FlightState_Update(State *current_flight_state, float altitude, float veloc
       case LANDED: //LANDED
         GPIOA->BSRR = (1U << 16);   // PA0 low = LED on (active-low)
         break;
-
-      }
-}
+    }

@@ -1,6 +1,6 @@
 #include "hardware.h"
 
-void led2Init(void) {
+void led0Init(void) {
   // configure PA5 for output push/pull
   GPIOA->MODER |= (1U << (5 * 2));
 
@@ -109,5 +109,5 @@ void hardwareInit(void) {
   enable_12V();
   latch_init();
   // -- LED --
-  led2Init();
+  led0Init();
 }
