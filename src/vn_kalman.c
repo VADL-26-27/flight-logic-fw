@@ -30,6 +30,8 @@
 
 #ifndef VN_G_CONST
 #define VN_G_CONST 9.80665f
+#define VN_M_TO_FT    3.28084f            // 1 m = 3.28084 ft
+#define VN_MPS2_TO_G  (1.0f / 9.80665f)   // 1 g = 9.80665 m/s^2
 #endif
 
 #define VN_DEG2RAD 0.017453292519943295f
@@ -184,9 +186,9 @@ void updateState(uint8_t* packet, IMUState* state, vn_kf_t* kf) {
                imu_packet.az * inv_g,
                imu_packet.pressure, dt);
     
-    state->altitude = vn_kf_altitude(kf);
-    state->velocity = vn_kf_velocity(kf);
-    state->acceleration = kf->accel_up - vn_kf_bias(kf);
+    state->altitude = vn_kf_altitude(kf) * VN_M_TO_FT;
+    state->velocity = vn_kf_velocity(kf) * VN_M_TO_FT;
+    state->acceleration = (kf->accel_up - vn_kf_bias(kf)) * VN_MPS2_TO_G;
 }
 
 /* ---------------------------------------------------------------------- */

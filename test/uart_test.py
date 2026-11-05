@@ -43,9 +43,6 @@ def main():
     import struct 
 
     print(f"Listening on {PORT} at {BAUD} baud. Ctrl+C stops.")
-    print(f"{'Yaw':>8} {'Pitch':>8} {'Roll':>8} | {'Ax':>8} {'Ay':>8} {'Az':>8} | {'Pressure':>9}")
-    print(f"{'(deg)':>8} {'(deg)':>8} {'(deg)':>8} | {'(m/s²)':>8} {'(m/s²)':>8} {'(m/s²)':>8} | {'(kPa)':>9}")
-    print("-" * 70)
     pending = bytearray()
     received_bytes = 0
     valid_packets = 0
@@ -63,8 +60,9 @@ def main():
                     for packet in extract_packets(pending):
                         valid_packets += 1
                         yaw, pitch, roll, ax, ay, az, pres = struct.unpack_from("<7f", packet, 6)
-                        print(f"{yaw:8.2f} {pitch:8.2f} {roll:8.2f} | "
-                              f"{ax:8.3f} {ay:8.3f} {az:8.3f} | {pres:9.3f}", flush=True)
+                        print(f"Yaw: {yaw:8.2f}°  Pitch: {pitch:8.2f}°  Roll: {roll:8.2f}° | "
+                        f"Ax: {ax:8.3f}  Ay: {ay:8.3f}  Az: {az:8.3f} m/s² | "
+                        f"Pressure: {pres:9.3f} kPa", flush=True)
                 now = time.monotonic()
                 if now - last_status >= 3:
                     if received_bytes == 0:
