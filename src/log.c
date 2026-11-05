@@ -54,8 +54,15 @@ static BlockKind pending_kind;
 static uint32_t pending_records;
 
 typedef enum {
-  DUMP_BEGIN, DUMP_READ, DUMP_WAIT, DUMP_TAG, DUMP_DATA, DUMP_END, DUMP_ERROR
+  DUMP_BEGIN,
+  DUMP_READ,
+  DUMP_WAIT,
+  DUMP_TAG,
+  DUMP_DATA,
+  DUMP_END,
+  DUMP_ERROR
 } DumpStage;
+
 static DumpStage dump_stage;
 static uint32_t dump_address;
 static uint32_t dump_offset;

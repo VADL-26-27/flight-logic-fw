@@ -1,18 +1,11 @@
 #include "hardware.h"
 
 void led0Init(void) {
-  // configure PA5 for output push/pull
-  GPIOA->MODER |= (1U << (5 * 2));
-
-  // set push/pull
-  GPIOA->OTYPER &= ~(1U << 5);
-
-  // set PU/PD to off
-  GPIOA->PUPDR &= ~(3U << (5 * 2));
-
-  // initialize off
-  GPIOA->BSRR = (1U << (16 + 5));
-  // GPIOA->BSRR |= (1U << 5);
+  GPIOA->BSRR = (1U << 0);          // high = LED off
+  GPIOA->OTYPER &= ~(1U << 0);      // push-pull
+  GPIOA->PUPDR &= ~(3U << (0 * 2)); // no pull
+  GPIOA->MODER &= ~(3U << (0 * 2));
+  GPIOA->MODER |= (1U << (0 * 2)); // output
 }
 
 void timer_init(void) {
@@ -105,9 +98,7 @@ void hardwareInit(void) {
   clock_init_hse();
 
   timer_init();
-
   enable_12V();
   latch_init();
-  // -- LED --
   led0Init();
 }

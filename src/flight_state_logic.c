@@ -92,9 +92,7 @@ void FlightState_Update(State *current_flight_state, float altitude, float veloc
           }
           break;
       case DEPLOYMENT: //DEPLOYMENT
-      //while velocity is less than velocity threshold
-      //verify if the velocity will be negative or positive here
-          if (velocity < LANDED_VELOCITY_THRESH) { 
+          if (fabsf(velocity) < LANDED_VELOCITY_THRESH) {
 
               if (timer == 0) {
                   landed_start_time = now_ms();
@@ -115,3 +113,4 @@ void FlightState_Update(State *current_flight_state, float altitude, float veloc
         GPIOA->BSRR = (1U << 16);   // PA0 low = LED on (active-low)
         break;
     }
+}
