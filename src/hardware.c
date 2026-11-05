@@ -1,5 +1,4 @@
 #include "hardware.h"
-
 static bool wait_register(volatile uint32_t *reg, uint32_t mask,
                           uint32_t expected) {
   uint32_t timeout = 1000000U;
@@ -13,19 +12,12 @@ static bool wait_register(volatile uint32_t *reg, uint32_t mask,
   return true;
 }
 
-void led2Init(void) {
-  // configure PA5 for output push/pull
-  GPIOA->MODER |= (1U << (5 * 2));
-
-  // set push/pull
-  GPIOA->OTYPER &= ~(1U << 5);
-
-  // set PU/PD to off
-  GPIOA->PUPDR &= ~(3U << (5 * 2));
-
-  // initialize off
-  GPIOA->BSRR = (1U << (16 + 5));
-  // GPIOA->BSRR |= (1U << 5);
+void led0Init(void) {
+  GPIOA->BSRR = (1U << 0);          // high = LED off
+  GPIOA->OTYPER &= ~(1U << 0);      // push-pull
+  GPIOA->PUPDR &= ~(3U << (0 * 2)); // no pull
+  GPIOA->MODER &= ~(3U << (0 * 2));
+  GPIOA->MODER |= (1U << (0 * 2)); // output
 }
 
 void timer_init(void) {
@@ -150,9 +142,7 @@ void hardwareInit(void) {
   clock_init();
 
   timer_init();
-
   enable_12V();
   latch_init();
-  // -- LED --
-  led2Init();
+  led0Init();
 }

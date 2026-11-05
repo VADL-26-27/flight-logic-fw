@@ -9,7 +9,7 @@
 #include "usart_board.h"
 #include "latch.h"
 #include "spi_board.h"
-#include "flash_mem.h"
+#include "log.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -23,121 +23,93 @@ IMUState state;
 vn_kf_t kalman_filter;
 
 static float maxAltitude;
-static float maxVelocity;
-static float maxAccel;
 
 State current_flight_state = STANDBY;
 uint8_t synced;
 
-#define TEST_ADDRESS 0x00000000U
-
-uint8_t message[] = "Hello world! 0\n";
-static uint8_t readback[sizeof(message)];
-static uint32_t test_number = 0U;
-
-uint32_t last_test_finished_ms = 0U;
-bool waiting_to_restart = false;
-
 uint32_t delay = 2000U;
 bool on = false;
 uint32_t switch_on;
+uint8_t packet_count = 0;
 
-typedef enum {
-  TEST_PROBE,
-  TEST_ERASE,
-  TEST_WRITE,
-  TEST_READ,
-  TEST_FINISHED
-} flash_test_stage_t;
+static bool imu_started = false;
+static uint32_t last_imu_command_ms;
+static bool dump_active;
+static bool dump_queued;
 
-static flash_test_stage_t flash_test_stage;
-
-/* Inspect these in the debugger. */
-static volatile bool flash_test_done;
-static volatile bool flash_test_passed;
-static volatile bool flash_fault;
-static volatile uint32_t detected_id;
-
-static void flash_test_fail(void) {
-  flash_fault = true;
-  flash_test_done = true;
-  flash_test_stage = TEST_FINISHED;
+static bool dump_send(const uint8_t *data, uint32_t length) {
+  return usart_write(&uart2, data, length);
 }
 
-/* Called after spi_poll() and flash_poll(). */
-static void flash_test_poll(void) {
-  if (flash_test_done || flash.busy) {
+static void poll_dump(void) {
+  /* Discard commands sent during the binary stream. */
+  uint8_t byte;
+  for (uint32_t i = 0; i < BUFFER_SIZE && usart_read(&uart2, &byte, 1U); ++i) {
+  }
+  if (!dump_queued)
+    dump_queued = logger_dump_poll(dump_send);
+  if (!dump_queued || atomic_load(&uart2.tx->count) != 0U ||
+      !(uart2.regs->SR & USART_SR_TC))
     return;
+
+  /* USART1 RX IRQ is disabled. Drop queued bytes and clear hardware errors. */
+  init_buf(uart1.rx);
+  (void)uart1.regs->SR;
+  (void)uart1.regs->DR;
+  synced = 0;
+  NVIC_ClearPendingIRQ(uart1.irqn);
+  NVIC_EnableIRQ(uart1.irqn);
+  dump_active = false;
+}
+
+static void poll_log_commands(void) {
+  static char command[16];
+  static uint32_t length;
+  static bool overflow;
+  static const char *reply;
+
+  if (reply != NULL) {
+    if (!usart_write(&uart2, (const uint8_t *)reply, strlen(reply)))
+      return;
+    reply = NULL;
   }
 
-  if (flash.result == FLASH_RESULT_FAILED) {
-    flash_ack_result(&flash);
-    flash_test_fail();
-    return;
-  }
+  uint8_t byte;
+  for (uint32_t i = 0; i < sizeof(command) && usart_read(&uart2, &byte, 1U);
+       ++i) {
+    if (byte != '\n') {
+      if (length < sizeof(command))
+        command[length++] = (char)byte;
+      else
+        overflow = true;
+      continue;
+    }
 
-  if (flash.result != FLASH_RESULT_OK) {
-    return;
-  }
+    if (length != 0U && command[length - 1U] == '\r')
+      --length;
 
-  flash_ack_result(&flash);
-
-  switch (flash_test_stage) {
-  case TEST_PROBE:
-    detected_id = flash.jedec;
-
-    /* Destructive: erase the first 4 KiB test sector. */
-    if (!flash_erase_sector(&flash, TEST_ADDRESS)) {
-      const uint8_t message[] = "Erase Failed!\n";
-      usart_write(&uart2, (const uint8_t *)message, sizeof(message) - 1U);
-      flash_test_fail();
+    bool on_ground =
+        current_flight_state == STANDBY || current_flight_state == LANDED;
+    if (!overflow && length == 10U && memcmp(command, "LOG STATUS", 10U) == 0) {
+      reply = logger_status_reply();
+    } else if (!overflow && length == 9U &&
+               memcmp(command, "LOG CLEAR", 9U) == 0) {
+      reply = on_ground && logger_request_clear() ? "LOG CLEARING\r\n"
+                                                  : "LOG CLEAR REFUSED\r\n";
+    } else if (!overflow && length == 8U &&
+               memcmp(command, "LOG DUMP", 8U) == 0) {
+      if (on_ground && logger_request_dump()) {
+        NVIC_DisableIRQ(uart1.irqn);
+        dump_active = true;
+        dump_queued = false;
+      } else {
+        reply = "\r\nLOG DUMP REFUSED\r\n";
+      }
+    }
+    length = 0;
+    overflow = false;
+    if (reply != NULL || dump_active)
       return;
-    }
-
-    flash_test_stage = TEST_ERASE;
-    break;
-
-  case TEST_ERASE:
-    if (!flash_program(&flash, TEST_ADDRESS, message, sizeof(message))) {
-      const uint8_t message[] = "Write Failed!\n";
-      usart_write(&uart2, (const uint8_t *)message, sizeof(message) - 1U);
-      flash_test_fail();
-      return;
-    }
-
-    flash_test_stage = TEST_WRITE;
-    break;
-
-  case TEST_WRITE:
-    if (!flash_read(&flash, TEST_ADDRESS, readback, sizeof(readback))) {
-      const uint8_t message[] = "Read Failed!\n";
-      usart_write(&uart2, (const uint8_t *)message, sizeof(message) - 1U);
-      flash_test_fail();
-      return;
-    }
-
-    flash_test_stage = TEST_READ;
-    break;
-
-  case TEST_READ:
-    flash_test_passed = memcmp(message, readback, sizeof(message)) == 0;
-
-    if (flash_test_passed) {
-      const uint8_t message[] = "Test Passed!\n";
-      usart_write(&uart2, (const uint8_t *)message, sizeof(message) - 1U);
-      usart_write(&uart2, readback, sizeof(readback) - 1U);
-    } else {
-      const uint8_t message[] = "Test Failed!\n";
-      usart_write(&uart2, (const uint8_t *)message, sizeof(message) - 1U);
-    }
-    flash_fault = !flash_test_passed;
-    flash_test_done = true;
-    flash_test_stage = TEST_FINISHED;
-    break;
-
-  default:
-    flash_test_fail();
-    break;
   }
 }
 
@@ -150,105 +122,87 @@ int main(void) {
 
   usart_write(&uart1, (const uint8_t *)imu_command, sizeof(imu_command) - 1U);
   delay_ms(500U);
+  last_imu_command_ms = now_ms();
 
-  flash_test_stage = TEST_PROBE;
-
-  if (!flash_probe(&flash)) {
-    flash_test_fail();
-  }
+  logger_init(&flash);
 
   while (1) {
     spi_poll(&spi1);
     flash_poll(&flash);
-    flash_test_poll();
-
-    // Restart two seconds after the previous test finishes.
-    if (flash_test_done) {
-      if (!waiting_to_restart) {
-        last_test_finished_ms = now_ms();
-        waiting_to_restart = true;
-      }
-
-      if ((uint32_t)(now_ms() - last_test_finished_ms) >= 2000U &&
-          !flash.busy && !spi1.busy && !spi1.error) {
-
-        if (flash.result == FLASH_RESULT_OK ||
-            flash.result == FLASH_RESULT_FAILED) {
-          flash_ack_result(&flash);
-        }
-
-        flash_test_done = false;
-        flash_test_passed = false;
-        flash_fault = false;
-        flash_test_stage = TEST_PROBE;
-        waiting_to_restart = false;
-        message[13] = (message[13] == '9') ? '0' : message[13] + 1;
-
-        if (!flash_probe(&flash)) {
-          flash_test_fail();
-        }
-      }
+    if (dump_active) {
+      poll_dump();
+      continue;
     }
 
-    /*
-     * Bound UART work so flash polling runs regularly,
-     * even if UART data keeps arriving.
-     */
-    for (uint32_t budget = 0U; budget < 2U * PACKET_SIZE; ++budget) {
-
+    while (1) {
+      // Search for the packet header.
       if (!synced) {
         if (!usart_read(&uart1, &imu_packet[0], 1U)) {
-          break;
+          break; // No more bytes available.
         }
 
         if (imu_packet[0] != 0xFA) {
           continue;
         }
 
-        synced = 1U;
+        synced = 1;
       }
 
+      // Read the remaining packet once all its bytes are available.
       if (!usart_read(&uart1, &imu_packet[1], PACKET_SIZE - 1U)) {
-        break;
+        break; // Preserve synced until more bytes arrive.
       }
 
-      synced = 0U;
+      synced = 0;
 
       if (validate_packet(imu_packet)) {
+        imu_started = true;
         updateState(imu_packet, &state, &kalman_filter);
+
+        if (state.altitude > maxAltitude)
+          maxAltitude = state.altitude;
+
+        State previous = current_flight_state;
+        FlightState_Update(&current_flight_state, state.altitude,
+                           state.velocity, state.acceleration, maxAltitude);
+
+        IMURecord record = {
+            .timestamp_ms = now_ms(),
+            .postKf = state,
+            .flightState = current_flight_state,
+        };
+        parsePacket(imu_packet, &record.rawPacket);
+
+        if (previous == STANDBY && current_flight_state == LAUNCH)
+          logger_start();
+
+        if (current_flight_state == STANDBY) {
+          logger_push_ground(&record);
+        } else if (previous != LANDED) {
+          logger_push_flight(&record);
+          if (current_flight_state == LANDED)
+            logger_finish();
+        }
       }
     }
 
+    poll_log_commands();
+    if (dump_active)
+      continue;
+    logger_poll();
     uint32_t now = now_ms();
 
-    if ((uint32_t)(now - switch_on) >= delay) {
-      switch_on = now;
-      on = !on;
+    if (!imu_started && (uint32_t)(now - last_imu_command_ms) >= 1000U) {
 
-      if (on) {
-        set_latch_high(GPIOA, SW_3);
-        set_latch_high(GPIOB, SW_1);
-        set_latch_high(GPIOB, SW_2);
-      } else {
-        set_latch_low(GPIOA, SW_3);
-        set_latch_low(GPIOB, SW_1);
-        set_latch_low(GPIOB, SW_2);
+      if (usart_write(&uart1, (const uint8_t *)imu_command,
+                      sizeof(imu_command) - 1U)) {
+        last_imu_command_ms = now;
       }
     }
 
-    if (state.altitude > maxAltitude) {
-      maxAltitude = state.altitude;
+    if (current_flight_state == LANDED) {
+      // Disable IMU interrupts upon landing detection
+      NVIC_DisableIRQ(uart1.irqn);
     }
-
-    if (state.velocity > maxVelocity) {
-      maxVelocity = state.velocity;
-    }
-
-    if (state.acceleration > maxAccel) {
-      maxAccel = state.acceleration;
-    }
-
-    FlightState_Update(&current_flight_state, state.altitude, state.velocity,
-                       state.acceleration, maxAltitude);
   }
 }
