@@ -60,11 +60,6 @@ void clock_init(void) {
   if (!wait_register(&FLASH->ACR, FLASH_ACR_LATENCY, FLASH_ACR_LATENCY_3WS))
     return;
 
-  // HCLK = SYSCLK /1.
-  // PCLK1 = HCLK /2; PCLK2 = HCLK /2.
-  RCC->CFGR = (RCC->CFGR & ~(RCC_CFGR_HPRE | RCC_CFGR_PPRE1 | RCC_CFGR_PPRE2)) |
-              RCC_CFGR_PPRE1_DIV2 | RCC_CFGR_PPRE2_DIV2;
-
   // PLLM = 25, PLLN = 200, PLLP = 2, PLLQ = 4.
   // PLLP encoding 00 means divide by 2.
   RCC->PLLCFGR =
@@ -79,6 +74,11 @@ void clock_init(void) {
 
   if (!wait_register(&PWR->CSR, PWR_CSR_VOSRDY, PWR_CSR_VOSRDY))
     return;
+
+  // HCLK = SYSCLK /1.
+  // PCLK1 = HCLK /2; PCLK2 = HCLK /2.
+  RCC->CFGR = (RCC->CFGR & ~(RCC_CFGR_HPRE | RCC_CFGR_PPRE1 | RCC_CFGR_PPRE2)) |
+              RCC_CFGR_PPRE1_DIV2 | RCC_CFGR_PPRE2_DIV2;
 
   // Switch SYSCLK from HSI to PLL.
   RCC->CFGR = (RCC->CFGR & ~RCC_CFGR_SW) | RCC_CFGR_SW_PLL;

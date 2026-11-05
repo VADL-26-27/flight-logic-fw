@@ -69,8 +69,8 @@ void spi_init(spi_t *port) {
   port->regs->CR2 = 0;
   port->regs->I2SCFGR = 0; // Selects SPI rather than I2S
 
-  // Configure Baud Rate for divisor to be /4
-  port->regs->CR1 |= SPI_CR1_MSTR | SPI_CR1_SSM | SPI_CR1_SSI | SPI_CR1_BR_0;
+  // Configure Baud Rate for divisor to be /2
+  port->regs->CR1 |= SPI_CR1_MSTR | SPI_CR1_SSM | SPI_CR1_SSI;
 
   spi_dma_init(port);
 
@@ -167,8 +167,7 @@ void spi1_reset_periphreal(spi_t *port) {
   port->regs->I2SCFGR = 0;
   port->regs->CR2 = 0;
 
-  port->regs->CR1 = SPI_CR1_MSTR | SPI_CR1_SSM | SPI_CR1_SSI |
-                    SPI_CR1_BR_0; // /4: 6.25 MHz with PCLK2 = 25 MHz
+  port->regs->CR1 = SPI_CR1_MSTR | SPI_CR1_SSM | SPI_CR1_SSI;
 }
 
 bool spi_recover(spi_t *port) {

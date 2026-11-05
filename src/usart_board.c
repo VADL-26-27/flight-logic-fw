@@ -45,7 +45,7 @@ static void hardwareUsart1Init(void) {
 usart_t uart1 = {
     .regs = USART1,
     .irqn = USART1_IRQn,
-    .clock_hz = 25000000U,
+    .clock_hz = 50000000U,
     .baud_rate = 115200U,
     .rx = &uart1_rx,
     .tx = &uart1_tx,
@@ -56,8 +56,8 @@ usart_t uart1 = {
 usart_t uart2 = {
     .regs = USART2,
     .irqn = USART2_IRQn,
-    .clock_hz = 25000000U,
-    .baud_rate = 115200U,
+    .clock_hz = 50000000U,
+    .baud_rate = 1000000U,
     .rx = &uart2_rx,
     .tx = &uart2_tx,
     .enable_clock = usart_2_enable_clock,
@@ -65,6 +65,14 @@ usart_t uart2 = {
 };
 
 void board_usart_init(void) {
+  uint32_t cfgr = RCC->CFGR;
+  uint32_t ppre1 = (cfgr & RCC_CFGR_PPRE1) >> RCC_CFGR_PPRE1_Pos;
+  uint32_t ppre2 = (cfgr & RCC_CFGR_PPRE2) >> RCC_CFGR_PPRE2_Pos;
+
+  uart1.clock_hz = SystemCoreClock >> APBPrescTable[ppre2];
+  uart2.clock_hz = SystemCoreClock >> APBPrescTable[ppre1];
+  uart2.baud_rate = uart2.clock_hz == 50000000U ? 1000000U : 500000U;
+
   usart_init(&uart1);
   usart_init(&uart2);
 }

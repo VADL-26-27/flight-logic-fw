@@ -119,6 +119,7 @@ def main():
     download = commands.add_parser("download", help="save the raw serial dump")
     download.add_argument("port", help="serial port, e.g. COM12")
     download.add_argument("output", type=Path, help="new .bin output file")
+    download.add_argument("--baud", type=int, choices=(1000000, 500000), default=1000000)
     parse = commands.add_parser("parse", help="decode and verify a saved dump")
     parse.add_argument("input", type=Path)
     parse.add_argument("output", type=Path, help="new .csv output file")
@@ -130,7 +131,7 @@ def main():
                 import serial
             except ImportError:
                 parser.error("download requires pyserial (python -m pip install pyserial)")
-            with serial.Serial(args.port, 115200, timeout=1.5, write_timeout=2) as port:
+            with serial.Serial(args.port, args.baud, timeout=1.5, write_timeout=2) as port:
                 with args.output.open("xb") as output:
                     sectors = receive_dump(port, output)
             print(f"Saved {sectors} sectors to {args.output}. Run parse to verify the log.")
