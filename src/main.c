@@ -1,4 +1,3 @@
-#include "stm32f4xx.h"
 #include "stm32f413xx.h"
 
 #include "hardware.h"
@@ -127,8 +126,15 @@ int main(void) {
   logger_init(&flash);
 
   while (1) {
+    if ((deployed) && (now_ms() - deployed_time >= LATCH_HOLD_TIME)) {
+      set_latch_low(GPIOB, SW_2);
+      set_latch_low(GPIOA, SW_3);
+      deployed = 0;
+    }
+
     spi_poll(&spi1);
     flash_poll(&flash);
+
     if (dump_active) {
       poll_dump();
       continue;
@@ -193,16 +199,10 @@ int main(void) {
     uint32_t now = now_ms();
 
     if (!imu_started && (uint32_t)(now - last_imu_command_ms) >= 1000U) {
-
       if (usart_write(&uart1, (const uint8_t *)imu_command,
                       sizeof(imu_command) - 1U)) {
         last_imu_command_ms = now;
       }
-    }
-
-    if (current_flight_state == LANDED) {
-      // Disable IMU interrupts upon landing detection
-      NVIC_DisableIRQ(uart1.irqn);
     }
   }
 }

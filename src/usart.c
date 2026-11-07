@@ -23,6 +23,11 @@ void usart_init(usart_t *port) {
 
   port->regs->BRR = (port->clock_hz + port->baud_rate / 2U) / port->baud_rate;
 
+  if (port->regs == USART1)
+    NVIC_SetPriority(port->irqn, USART1_PRIORITY);
+  if (port->regs == USART2)
+    NVIC_SetPriority(port->irqn, USART2_PRIORITY);
+
   NVIC_ClearPendingIRQ(port->irqn);
   NVIC_EnableIRQ(port->irqn);
 

@@ -5,6 +5,9 @@
 #include "ring_buf.h"
 #include <stdbool.h>
 
+#define USART1_PRIORITY 4
+#define USART2_PRIORITY 8
+
 typedef struct usart usart_t;
 
 struct usart {

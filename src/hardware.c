@@ -13,11 +13,14 @@ static bool wait_register(volatile uint32_t *reg, uint32_t mask,
 }
 
 void led0Init(void) {
-  GPIOA->BSRR = (1U << 0);          // high = LED off
-  GPIOA->OTYPER &= ~(1U << 0);      // push-pull
-  GPIOA->PUPDR &= ~(3U << (0 * 2)); // no pull
   GPIOA->MODER &= ~(3U << (0 * 2));
   GPIOA->MODER |= (1U << (0 * 2)); // output
+
+  GPIOA->OTYPER &= ~(1U << 0); // push-pull
+
+  GPIOA->PUPDR &= ~(3U << (0 * 2)); // no pull
+
+  GPIOA->BSRR = (1U << 0); // high = LED off
 }
 
 void timer_init(void) {

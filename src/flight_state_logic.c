@@ -4,17 +4,17 @@
 #include "hardware.h"
 #include "timer.h"
 
-#define LAUNCH_ACCEL_THRESH      0.3f    /* G */
-#define LAUNCH_TIME_THRESH       100u     /* ms */
-#define DESCENT_ALTITUDE_THRESH  200.0f   /* ft */
-#define DESCENT_TIME_THRESH      100u    /* ms */
-#define DEPLOYMENT_ALTITUDE_THRESH 250.0f  /* ft above ground */
-#define DEPLOYMENT_TIME_THRESH   100u    /* ms */
-#define LANDED_VELOCITY_THRESH   1.0f    /* ft/s */
-#define LANDED_TIME_THRESH       100u    /* ms */
+#define LAUNCH_ACCEL_THRESH 3.0f          /* G */
+#define LAUNCH_TIME_THRESH 100u           /* ms */
+#define DESCENT_ALTITUDE_THRESH 200.0f    /* ft */
+#define DESCENT_TIME_THRESH 100u          /* ms */
+#define DEPLOYMENT_ALTITUDE_THRESH 250.0f /* ft above ground */
+#define DEPLOYMENT_TIME_THRESH 100u       /* ms */
+#define LANDED_VELOCITY_THRESH 1.0f       /* ft/s */
+#define LANDED_TIME_THRESH 100u           /* ms */
+#define LAUNCH_ALTITUDE_THRESH 300U       /* ft */
 
-
-//variables for state transisition
+// variables for state transisition
 uint32_t launch_start_time = 0;
 uint32_t launch_time = 0;
 uint32_t descent_start_time = 0;
@@ -25,92 +25,98 @@ uint32_t deployment_time = 0;
 uint32_t landed_start_time = 0;
 uint32_t landed_time = 0;
 
-void FlightState_Update(State *current_flight_state, float altitude, float velocity, float accel, float maxAltitude) {
+uint8_t deployed = 0;
+uint32_t deployed_time;
 
-    static uint8_t timer = 0;
-    switch (*current_flight_state) {
-      case STANDBY: //STANDBY
-      //while accelaration is less than threshhold and
-      //launch time less than threshold
-          if (accel >= LAUNCH_ACCEL_THRESH) {
+void FlightState_Update(State *current_flight_state, float altitude,
+                        float velocity, float accel, float maxAltitude) {
 
-              if (timer == 0) {
-                  launch_start_time = now_ms();
-                  timer = 1;
-              }
+  static uint8_t timer = 0;
+  switch (*current_flight_state) {
+  case STANDBY: // STANDBY
+    // while accelaration is less than threshhold and
+    // launch time less than threshold
+    if (accel >= LAUNCH_ACCEL_THRESH || altitude >= LAUNCH_ALTITUDE_THRESH) {
 
-              if (now_ms() - launch_start_time >= LAUNCH_TIME_THRESH) {
-                  launch_time = now_ms() - launch_start_time;
-                  *current_flight_state = LAUNCH;
-                  timer = 0;
-              }
+      if (timer == 0) {
+        launch_start_time = now_ms();
+        timer = 1;
+      }
 
-          } else {
-              timer = 0;
-          }
-          break;
+      if (now_ms() - launch_start_time >= LAUNCH_TIME_THRESH) {
+        launch_time = now_ms() - launch_start_time;
+        *current_flight_state = LAUNCH;
+        timer = 0;
+      }
 
-      case LAUNCH: //LAUNCH
-      //while altitude is greater than max altitude - 500
-          if (altitude < maxAltitude - DESCENT_ALTITUDE_THRESH) {
-
-              if (timer == 0) {
-                  descent_start_time = now_ms();
-                  timer = 1;
-              }
-
-              if (now_ms() - descent_start_time >= DESCENT_TIME_THRESH)
-              {
-                  descent_time = now_ms() - descent_start_time;
-                  *current_flight_state = DESCENT;
-                  timer = 0;
-              }
-
-          } else {
-              timer = 0;
-          }
-          break;
-      case DESCENT: //DESCENT
-      //while altitude is greater than deployment altitude threshold
-
-          if (altitude < DEPLOYMENT_ALTITUDE_THRESH) {
-
-              if (timer == 0) {
-                  deployment_start_time = now_ms();
-                  timer = 1;
-              }
-
-              if (now_ms() - deployment_start_time >=
-              DEPLOYMENT_TIME_THRESH) {
-                  deployment_time = now_ms() - deployment_start_time;
-                  *current_flight_state = DEPLOYMENT;
-                  timer = 0;
-              }
-
-          } else {
-              timer = 0;
-          }
-          break;
-      case DEPLOYMENT: //DEPLOYMENT
-          if (fabsf(velocity) < LANDED_VELOCITY_THRESH) {
-
-              if (timer == 0) {
-                  landed_start_time = now_ms();
-                  timer = 1;
-              }
-
-              if (now_ms() - landed_start_time >= LANDED_TIME_THRESH) {
-                  landed_time = now_ms() - landed_start_time;
-                  *current_flight_state = LANDED;
-                  timer = 0;
-              }
-
-          } else {
-              timer = 0;
-          }
-          break;
-      case LANDED: //LANDED
-        GPIOA->BSRR = (1U << 16);   // PA0 low = LED on (active-low)
-        break;
+    } else {
+      timer = 0;
     }
+    break;
+
+  case LAUNCH: // LAUNCH
+    // while altitude is greater than max altitude - 500
+    if (altitude < maxAltitude - DESCENT_ALTITUDE_THRESH) {
+
+      if (timer == 0) {
+        descent_start_time = now_ms();
+        timer = 1;
+      }
+
+      if (now_ms() - descent_start_time >= DESCENT_TIME_THRESH) {
+        descent_time = now_ms() - descent_start_time;
+        *current_flight_state = DESCENT;
+        timer = 0;
+      }
+
+    } else {
+      timer = 0;
+    }
+    break;
+  case DESCENT: // DESCENT
+    // while altitude is greater than deployment altitude threshold
+
+    if (altitude < DEPLOYMENT_ALTITUDE_THRESH) {
+
+      if (timer == 0) {
+        deployment_start_time = now_ms();
+        timer = 1;
+      }
+
+      if (now_ms() - deployment_start_time >= DEPLOYMENT_TIME_THRESH) {
+        deployment_time = now_ms() - deployment_start_time;
+        *current_flight_state = DEPLOYMENT;
+        set_latch_high(GPIOB, SW_2);
+        set_latch_high(GPIOA, SW_3);
+        deployed_time = now_ms();
+        deployed = 1;
+        timer = 0;
+      }
+
+    } else {
+      timer = 0;
+    }
+    break;
+  case DEPLOYMENT: // DEPLOYMENT
+    if (fabsf(velocity) < LANDED_VELOCITY_THRESH) {
+
+      if (timer == 0) {
+        landed_start_time = now_ms();
+        timer = 1;
+      }
+
+      if (now_ms() - landed_start_time >= LANDED_TIME_THRESH) {
+        landed_time = now_ms() - landed_start_time;
+        *current_flight_state = LANDED;
+        timer = 0;
+      }
+
+    } else {
+      timer = 0;
+    }
+    break;
+  case LANDED:                // LANDED
+    GPIOA->BSRR = (1U << 16); // PA0 low = LED on (active-low)
+    break;
+  }
 }
