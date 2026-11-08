@@ -52,6 +52,14 @@ Example:
 python flight_log.py parse flight.bin flight.csv
 ```
 
+### To Plot a CSV
+
+Requires `matplotlib` and `pandas`. Writes `flight.png` next to the CSV, replacing any existing file, unless you pass an output name.
+
+```
+python plot_flight.py flight.csv [output.png] [--title "My title"]
+```
+
 ### To Erase SPI Flash
 
 ```
