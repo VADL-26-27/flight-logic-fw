@@ -4,7 +4,7 @@
 #include "flash_mem.h"
 
 #define PRELAUNCH_RECORDS 3000U
-#define FLIGHT_BUFFER_RECORDS 256U
+#define FLIGHT_BUFFER_RECORDS 128U
 
 #include <stdint.h>
 #include "flight_state_logic.h"

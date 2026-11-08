@@ -8,11 +8,11 @@
 #define LAUNCH_TIME_THRESH 100u           /* ms */
 #define DESCENT_ALTITUDE_THRESH 200.0f    /* ft */
 #define DESCENT_TIME_THRESH 100u          /* ms */
-#define DEPLOYMENT_ALTITUDE_THRESH 250.0f /* ft above ground */
+#define DEPLOYMENT_ALTITUDE_THRESH 100.0f /* ft above ground */
 #define DEPLOYMENT_TIME_THRESH 100u       /* ms */
-#define LANDED_VELOCITY_THRESH 1.0f       /* ft/s */
-#define LANDED_TIME_THRESH 100u           /* ms */
-#define LAUNCH_ALTITUDE_THRESH 300U       /* ft */
+#define LANDED_VELOCITY_THRESH 2.0f       /* ft/s */
+#define LANDED_TIME_THRESH 100U           /* ms */
+#define LAUNCH_ALTITUDE_THRESH 400U       /* ft */
 
 // variables for state transisition
 uint32_t launch_start_time = 0;
@@ -27,6 +27,7 @@ uint32_t landed_time = 0;
 
 uint8_t deployed = 0;
 uint32_t deployed_time;
+uint8_t oscillate = 0;
 
 void FlightState_Update(State *current_flight_state, float altitude,
                         float velocity, float accel, float maxAltitude) {
@@ -46,6 +47,8 @@ void FlightState_Update(State *current_flight_state, float altitude,
       if (now_ms() - launch_start_time >= LAUNCH_TIME_THRESH) {
         launch_time = now_ms() - launch_start_time;
         *current_flight_state = LAUNCH;
+        oscillate = 1;
+        // GPIOA->BSRR = (1U << 16); // PA0 low = LED on (active-low)
         timer = 0;
       }
 
@@ -66,6 +69,7 @@ void FlightState_Update(State *current_flight_state, float altitude,
       if (now_ms() - descent_start_time >= DESCENT_TIME_THRESH) {
         descent_time = now_ms() - descent_start_time;
         *current_flight_state = DESCENT;
+        // GPIOA->BSRR = (1U << 16); // PA0 low = LED on (active-low)
         timer = 0;
       }
 
@@ -86,6 +90,7 @@ void FlightState_Update(State *current_flight_state, float altitude,
       if (now_ms() - deployment_start_time >= DEPLOYMENT_TIME_THRESH) {
         deployment_time = now_ms() - deployment_start_time;
         *current_flight_state = DEPLOYMENT;
+        // GPIOA->BSRR = (1U << 0); // PA0 low = LED on (active-low)
         set_latch_high(GPIOB, SW_2);
         set_latch_high(GPIOA, SW_3);
         deployed_time = now_ms();
@@ -108,6 +113,7 @@ void FlightState_Update(State *current_flight_state, float altitude,
       if (now_ms() - landed_start_time >= LANDED_TIME_THRESH) {
         landed_time = now_ms() - landed_start_time;
         *current_flight_state = LANDED;
+        oscillate = 0;
         timer = 0;
       }
 

@@ -31,10 +31,30 @@ bool on = false;
 uint32_t switch_on;
 uint8_t packet_count = 0;
 
+uint8_t green = 0;
+uint32_t led_delay = 200U;
+uint32_t last_time = 0;
+
 static bool imu_started = false;
 static uint32_t last_imu_command_ms;
 static bool dump_active;
 static bool dump_queued;
+
+static void oscillate_led(uint8_t osc) {
+  uint32_t now = now_ms();
+
+  if (osc && (uint32_t)(now - last_time) >= led_delay) {
+    green = !green;
+
+    if (green) {
+      GPIOA->BSRR = (1U << 16); // PA0 low = LED on
+    } else {
+      GPIOA->BSRR = (1U << 0); // PA0 high = LED off
+    }
+
+    last_time = now;
+  }
+}
 
 static bool dump_send(const uint8_t *data, uint32_t length) {
   return usart_write(&uart2, data, length);
@@ -132,6 +152,7 @@ int main(void) {
       deployed = 0;
     }
 
+    oscillate_led(oscillate);
     spi_poll(&spi1);
     flash_poll(&flash);
 

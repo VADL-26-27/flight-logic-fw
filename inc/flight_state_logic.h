@@ -9,5 +9,6 @@ void FlightState_Update(State *current_flight_state, float altitude,
 
 extern uint8_t deployed;
 extern uint32_t deployed_time;
+extern uint8_t oscillate;
 
 #endif // FLIGHT_STATE_LOGIC_H_
